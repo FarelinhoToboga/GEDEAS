@@ -1,0 +1,1351 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Painel de Gestão e Disponibilidade de EAS - Força Aérea Brasileira</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Roboto+Condensed:wght@300;400;500;600;700&family=Roboto:wght@300;400;500;700&family=Roboto+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<!-- Chart.js para gráficos -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" defer></script>
+<!-- Supabase JS Client v2 -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root {
+    --fab-blue: #2B3F53;
+    --fab-blue-dark: #11212E;
+    --fab-blue-mid: #36495C;
+    --fab-blue-light: #1489CA;
+    --fab-cyan: #36BAE5;
+    --fab-accent: #29BC9C;
+    --fab-slate: #74879B;
+    --fab-yellow: #FFCC00;
+    --fab-yellow-dark: #E6B800;
+    --white: #FFFFFF;
+    --off-white: #F4F6F9;
+    --gray-50: #F9FAFB;
+    --gray-100: #E5E7EB;
+    --gray-200: #D1D5DB;
+    --gray-300: #9CA3AF;
+    --gray-500: #6B7280;
+    --gray-700: #374151;
+    --gray-900: #111827;
+    --green: #00A651;
+    --red: #C8102E;
+    --orange: #E07B00;
+    --pm-w: 240px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    background: var(--off-white);
+    color: var(--gray-900);
+    font-family: 'Roboto', sans-serif;
+    font-weight: 400;
+    min-height: 100vh;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* LAYOUT COM SIDEBAR */
+  body.logged-in { padding-left: var(--pm-w); }
+  body:not(.logged-in) { padding-left: 0; }
+
+  #sideNav {
+    position: fixed; left: 0; top: 0; bottom: 0; width: var(--pm-w);
+    background: var(--fab-blue); color: #E7E7E7; z-index: 70;
+    overflow-y: auto; border-right: 1px solid rgba(255,255,255,0.08);
+    display: none;
+  }
+  body.logged-in #sideNav { display: block; }
+
+  .sn-brand {
+    height: 64px; display: flex; align-items: center; gap: 12px; padding: 0 16px;
+    border-bottom: 1px solid rgba(255,255,255,0.08); background: var(--fab-blue-dark);
+  }
+  .sn-brand .emblem-box {
+    width: 38px; height: 38px; background: var(--fab-yellow); border-radius: 4px;
+    display: flex; align-items: center; justify-content: center; font-weight: 700; color: var(--fab-blue-dark);
+    font-family: 'Roboto Condensed', sans-serif; font-size: 14px;
+  }
+  .sn-brand .t { font-size: 15px; color: #fff; font-weight: 600; line-height: 1.1; }
+  .sn-brand .t small { display: block; font-size: 9.5px; color: var(--fab-yellow); letter-spacing: 0.1em; text-transform: uppercase; }
+  
+  .sn-user { display: flex; align-items: center; gap: 10px; padding: 14px; border-bottom: 1px solid rgba(255,255,255,0.06); }
+  .sn-user .av { width: 36px; height: 36px; border-radius: 50%; background: var(--fab-blue-light); display: flex; align-items: center; justify-content: center; font-weight: 700; color: #fff; font-size: 13px; }
+  .sn-user .who .nm { font-size: 13px; color: #fff; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 140px; }
+  .sn-user .who .rl { font-size: 10px; color: var(--fab-slate); text-transform: uppercase; letter-spacing: 0.05em; }
+
+  .sn-sec { padding: 16px 16px 6px; font-size: 10px; font-weight: 700; letter-spacing: 0.12em; color: var(--fab-slate); text-transform: uppercase; }
+  .sn-item {
+    display: flex; align-items: center; gap: 12px; padding: 12px 16px; color: #D0D7DE;
+    cursor: pointer; font-size: 13px; border-left: 4px solid transparent; user-select: none; text-decoration: none;
+    transition: background 0.15s, color 0.15s;
+  }
+  .sn-item:hover { background: var(--fab-blue-mid); color: #fff; }
+  .sn-item.active { background: var(--fab-blue-mid); color: #fff; border-left-color: var(--fab-yellow); font-weight: 500; }
+  .sn-item svg { width: 16px; height: 16px; fill: currentColor; flex-shrink: 0; }
+
+  /* TOP BAR */
+  #topBar {
+    position: sticky; top: 0; z-index: 60; height: 56px; background: var(--fab-blue); color: #fff;
+    display: none; align-items: center; justify-content: space-between; padding: 0 24px;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+  }
+  body.logged-in #topBar { display: flex; }
+  .tb-crumb { font-size: 13px; color: #B9C6D2; letter-spacing: 0.02em; }
+  .tb-crumb b { color: #fff; font-weight: 500; }
+  .tb-right { display: flex; align-items: center; gap: 15px; }
+  .tb-sync-badge { font-size: 11px; padding: 3px 8px; border-radius: 10px; font-family: 'Roboto Mono', monospace; display: flex; align-items: center; gap: 5px; }
+  .tb-sync-badge.online { background: rgba(0, 166, 81, 0.2); color: #4ADE80; border: 1px solid rgba(0, 166, 81, 0.4); }
+  .tb-sync-badge.offline { background: rgba(224, 123, 0, 0.2); color: #FBBF24; border: 1px solid rgba(224, 123, 0, 0.4); }
+
+  /* MAIN CONTAINER */
+  main { max-width: 1500px; margin: 0 auto; padding: 28px 32px 48px; }
+
+  /* AUTH / LOGIN SCREEN */
+  #authScreen {
+    display: flex; align-items: center; justify-content: center; min-height: 100vh;
+    background: linear-gradient(135deg, var(--fab-blue-dark) 0%, var(--fab-blue) 100%);
+    padding: 20px;
+  }
+  body.logged-in #authScreen { display: none; }
+  .auth-card {
+    background: var(--white); width: 100%; max-width: 480px; border-radius: 4px;
+    border-top: 5px solid var(--fab-yellow); box-shadow: 0 15px 35px rgba(0,0,0,0.4);
+    overflow: hidden;
+  }
+  .auth-header { background: var(--fab-blue-dark); color: #fff; padding: 24px; text-align: center; }
+  .auth-header h2 { font-family: 'Roboto Condensed', sans-serif; font-size: 20px; text-transform: uppercase; letter-spacing: 0.05em; margin-top: 8px; }
+  .auth-header p { font-size: 12px; color: var(--fab-slate); margin-top: 4px; }
+  .auth-body { padding: 28px; }
+
+  /* HEADER BANNER */
+  .header-banner {
+    background: var(--fab-blue); color: var(--white); border-bottom: 4px solid var(--fab-yellow);
+    padding: 24px 32px; margin-bottom: 28px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 20px;
+    border-radius: 4px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+  }
+  .hb-title h1 { font-family: 'Roboto Condensed', sans-serif; font-size: 24px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.02em; color: #fff; }
+  .hb-title p { font-size: 12.5px; color: rgba(255,255,255,0.75); margin-top: 4px; }
+  .hb-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+
+  /* BUTTONS */
+  .btn {
+    display: inline-flex; align-items: center; gap: 7px; background: var(--fab-blue-light); color: var(--white);
+    border: none; padding: 8px 16px; cursor: pointer; font-family: 'Roboto Condensed', sans-serif;
+    font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; border-radius: 2px;
+    transition: background 0.18s, transform 0.1s;
+  }
+  .btn:hover { background: var(--fab-blue-mid); filter: brightness(1.1); }
+  .btn:active { transform: translateY(1px); }
+  .btn.yellow { background: var(--fab-yellow); color: var(--fab-blue-dark); font-weight: 700; }
+  .btn.yellow:hover { background: var(--fab-yellow-dark); color: #111; }
+  .btn.outline { background: transparent; border: 1px solid rgba(255,255,255,0.4); color: #fff; }
+  .btn.outline:hover { background: rgba(255,255,255,0.1); }
+  .btn.danger { background: var(--red); color: #fff; }
+  .btn.success { background: var(--green); color: #fff; }
+  .btn.sm { padding: 5px 10px; font-size: 11px; }
+
+  /* KPIS */
+  .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 28px; }
+  .kpi {
+    background: var(--white); border: 1px solid var(--gray-200); padding: 20px 22px;
+    position: relative; border-radius: 2px; box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  }
+  .kpi::before { content: ''; position: absolute; top: 0; left: 0; width: 32px; height: 3px; background: var(--fab-yellow); }
+  .kpi.blue::before { background: var(--fab-blue-light); }
+  .kpi.green::before { background: var(--green); }
+  .kpi.orange::before { background: var(--orange); }
+  .kpi.red::before { background: var(--red); }
+  .kpi-lbl { font-family: 'Roboto Condensed', sans-serif; font-size: 11px; color: var(--gray-500); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 8px; font-weight: 600; }
+  .kpi-val { font-family: 'Roboto Condensed', sans-serif; font-size: 28px; font-weight: 700; color: var(--fab-blue); line-height: 1; }
+  .kpi-sub { margin-top: 6px; font-family: 'Roboto Mono', monospace; font-size: 10.5px; color: var(--gray-500); }
+
+  /* CARDS & SECTIONS */
+  .card {
+    background: var(--white); border: 1px solid var(--gray-200); border-radius: 2px;
+    padding: 22px 26px; margin-bottom: 28px; box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  }
+  .card-head {
+    display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;
+    padding-bottom: 10px; border-bottom: 1px solid var(--gray-100); flex-wrap: wrap; gap: 10px;
+  }
+  .card-head h2 { font-family: 'Roboto Condensed', sans-serif; font-size: 16px; font-weight: 600; color: var(--fab-blue); text-transform: uppercase; letter-spacing: 0.05em; }
+  .card-head .tag { font-family: 'Roboto Mono', monospace; font-size: 10px; color: var(--gray-500); }
+
+  /* TABLES */
+  .table-wrap { width: 100%; overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  th {
+    background: var(--fab-blue); color: var(--white); font-family: 'Roboto Condensed', sans-serif;
+    font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; padding: 10px 12px;
+    text-align: left; font-weight: 600; border-bottom: 2px solid var(--fab-yellow); white-space: nowrap;
+  }
+  th.num, td.num { text-align: right; font-family: 'Roboto Mono', monospace; }
+  td { padding: 10px 12px; border-bottom: 1px solid var(--gray-100); color: var(--gray-900); vertical-align: middle; white-space: nowrap; }
+  tr:hover td { background: var(--gray-50); }
+
+  /* BADGES / STATUS */
+  .badge {
+    display: inline-block; padding: 3px 8px; font-size: 10.5px; font-family: 'Roboto Mono', monospace;
+    font-weight: 600; border-radius: 2px; letter-spacing: 0.03em; white-space: nowrap;
+  }
+  .badge.operacional { background: #DDF3E4; color: #0B6E3A; border: 1px solid #BFE3CB; }
+  .badge.preventiva { background: #FFF0B8; color: #7A5A00; border: 1px solid #F2DE9A; }
+  .badge.corretiva { background: #FBE8EB; color: #8B1120; border: 1px solid #F1BEC6; }
+  .badge.inoperante { background: #F3F4F6; color: #4B5563; border: 1px solid #D1D5DB; }
+  .badge.urgente { background: #FEE2E2; color: #991B1B; border: 1px solid #FCA5A5; }
+  .badge.vencido { background: #FEF3C7; color: #92400E; border: 1px solid #FCD34D; }
+
+  /* VIEWS */
+  .view-pane { display: none; }
+  .view-pane.active { display: block; }
+
+  /* FILTERS & FORMS */
+  .filter-row { display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; align-items: center; }
+  .filter-row input, .filter-row select {
+    border: 1px solid var(--gray-200); border-radius: 2px; padding: 7px 10px; font-family: 'Roboto', sans-serif; font-size: 12.5px; color: var(--gray-900); background: #fff; min-width: 200px;
+  }
+  .filter-row input:focus, .filter-row select:focus { outline: 2px solid #BFE1F2; border-color: var(--fab-blue-light); }
+
+  /* MODALS */
+  .modal-backdrop {
+    position: fixed; inset: 0; background: rgba(0,26,61,0.7); z-index: 1000;
+    display: none; align-items: center; justify-content: center; padding: 20px;
+    backdrop-filter: blur(2px);
+  }
+  .modal-backdrop.open { display: flex; }
+  .modal {
+    background: var(--white); border-top: 4px solid var(--fab-yellow); border-radius: 4px;
+    width: 100%; max-width: 680px; max-height: calc(100vh - 40px); overflow-y: auto;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+  }
+  .modal-head {
+    background: var(--fab-blue); color: var(--white); padding: 16px 20px;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .modal-head h3 { font-family: 'Roboto Condensed', sans-serif; font-size: 15px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; }
+  .modal-close { background: transparent; border: none; color: #fff; font-size: 22px; cursor: pointer; }
+  .modal-body { padding: 20px; }
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .form-group { display: flex; flex-direction: column; gap: 5px; margin-bottom: 12px; }
+  .form-group.full { grid-column: 1 / -1; }
+  .form-group label { font-family: 'Roboto Condensed', sans-serif; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--gray-700); font-weight: 600; }
+  .form-group input, .form-group select, .form-group textarea {
+    border: 1px solid var(--gray-200); border-radius: 2px; padding: 8px 10px; font-family: 'Roboto', sans-serif; font-size: 13px; color: var(--gray-900);
+  }
+  .form-group input:focus, .form-group select:focus, .form-group textarea:focus { outline: 2px solid #BFE1F2; border-color: var(--fab-blue-light); }
+  .modal-foot { padding: 14px 20px; background: var(--gray-50); border-top: 1px solid var(--gray-100); display: flex; justify-content: flex-end; gap: 10px; }
+
+  /* NOTIFICATION TOAST */
+  #toastContainer { position: fixed; bottom: 20px; right: 20px; z-index: 2000; display: flex; flex-direction: column; gap: 10px; }
+  .toast {
+    background: var(--fab-blue-dark); color: #fff; padding: 12px 18px; border-radius: 3px; font-size: 13px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2); border-left: 4px solid var(--fab-yellow); animation: slideIn 0.2s ease;
+  }
+  @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+  @media(max-width: 900px) {
+    body.logged-in { padding-left: 0; }
+    #sideNav { transform: translateX(-100%); }
+    body.nav-open #sideNav { transform: none; }
+    .kpi-grid { grid-template-columns: 1fr 1fr; }
+    .form-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<!-- TELA DE AUTENTICAÇÃO E CONFIGURAÇÃO SUPABASE -->
+<div id="authScreen">
+  <div class="auth-card">
+    <div class="auth-header">
+      <div style="width:50px; height:50px; background:var(--fab-yellow); margin:0 auto 12px; border-radius:6px; display:flex; align-items:center; justify-content:center; color:var(--fab-blue-dark); font-weight:700; font-family:'Roboto Condensed'; font-size:18px;">SGA</div>
+      <h2>Sistema de Gestão de EAS</h2>
+      <p>Força Aérea Brasileira &bull; Acesso Restrito à Equipe</p>
+    </div>
+    <div class="auth-body">
+      <div style="margin-bottom:16px;">
+        <label style="font-size:11px; font-weight:700; text-transform:uppercase; color:var(--gray-700); display:block; margin-bottom:5px;">Modo de Conexão</label>
+        <div style="display:flex; gap:10px; margin-bottom:12px;">
+          <button type="button" class="btn sm" id="modeSupabaseBtn" onclick="toggleAuthMode('supabase')" style="flex:1;">Supabase (Equipe Compartilhada)</button>
+          <button type="button" class="btn sm outline" id="modeLocalBtn" onclick="toggleAuthMode('local')" style="color:var(--fab-blue); border-color:var(--fab-blue); flex:1;">Demonstração Local</button>
+        </div>
+      </div>
+
+      <div id="supabaseConfigForm">
+        <div class="form-group">
+          <label>Supabase URL</label>
+          <input type="text" id="supabaseUrlInput" placeholder="https://xxxxxx.supabase.co">
+        </div>
+        <div class="form-group">
+          <label>Supabase Anon / Public Key</label>
+          <input type="password" id="supabaseKeyInput" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...">
+        </div>
+        <hr style="margin:16px 0; border:0; border-top:1px solid var(--gray-200);">
+      </div>
+
+      <div class="form-group">
+        <label>E-mail ou Identificação Militar / Graduação</label>
+        <input type="text" id="authEmail" placeholder="Ex: Cap Aviador Silva / sga@fab.mil.br" value="cel.mota@fab.mil.br">
+      </div>
+      <div class="form-group" style="margin-bottom:20px;">
+        <label>Senha de Acesso</label>
+        <input type="password" id="authPassword" placeholder="••••••••" value="fab2026">
+      </div>
+
+      <button class="btn yellow" style="width:100%; justify-content:center; padding:12px;" onclick="handleLogin()">Acessar Painel SGA-EAS</button>
+      
+      <div style="margin-top:16px; font-size:11.5px; color:var(--gray-500); text-align:center;">
+        As credenciais do Supabase são salvas no seu navegador para sincronização em tempo real com a equipe.
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SIDEBAR NAV -->
+<nav id="sideNav">
+  <div class="sn-brand">
+    <div class="emblem-box">EAS</div>
+    <div class="t">
+      SGA - EAS
+      <small>Disponibilidade Solo</small>
+    </div>
+  </div>
+  <div class="sn-user">
+    <div class="av" id="userAvatarText">CM</div>
+    <div class="who">
+      <div class="nm" id="userNameDisplay"><b>Cel. Aviador Mota</b></div>
+      <div class="rl">Equipe Operacional</div>
+    </div>
+  </div>
+
+  <div class="sn-sec">Navegação Principal</div>
+  <a class="sn-item active" onclick="switchView('dashboard', this)">
+    <svg viewBox="0 0 24 24"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg>
+    <span class="lb">Dashboard Geral</span>
+  </a>
+  <a class="sn-item" onclick="switchView('inventory', this)">
+    <svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/></svg>
+    <span class="lb">Inventário de EAS</span>
+  </a>
+  <a class="sn-item" onclick="switchView('preventive', this)">
+    <svg viewBox="0 0 24 24"><path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11z"/></svg>
+    <span class="lb">Plano Preventivo (Calendário)</span>
+  </a>
+  <a class="sn-item" onclick="switchView('corrective', this)">
+    <svg viewBox="0 0 24 24"><path d="M22.7 19l-9.1-9.1c.9-2.3.4-5-1.5-6.9-2-2-5-2.4-7.4-1.3L9 6 6 9 1.6 4.7C.5 7.1.9 10.1 2.9 12.1c1.9 1.9 4.6 2.4 6.9 1.5l9.1 9.1c.4.4 1 .4 1.4 0l2.3-2.3c.5-.4.5-1.1.1-1.4z"/></svg>
+    <span class="lb">Histórico de Panes / Corretivas</span>
+  </a>
+
+  <div class="sn-sec">Sistema</div>
+  <a class="sn-item" onclick="exportDataCSV()">
+    <svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+    <span class="lb">Exportar Relatório CSV</span>
+  </a>
+  <a class="sn-item" onclick="handleLogout()" style="color:#FCA5A5;">
+    <svg viewBox="0 0 24 24"><path d="M10.09 15.59L11.5 17l5-5-5-5-1.41 1.41L12.67 11H3v2h9.67l-2.58 2.59zM19 3H5c-1.1 0-2 .9-2 2v4h2V5h14v14H5v-4H3v4c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z"/></svg>
+    <span class="lb">Encerrar Sessão</span>
+  </a>
+</nav>
+
+<!-- TOP BAR -->
+<header id="topBar">
+  <div class="tb-crumb">SGA-EAS &rsaquo; <b id="tbCurrentViewName">Dashboard de Disponibilidade</b></div>
+  <div class="tb-right">
+    <div id="syncStatusBadge" class="tb-sync-badge offline" title="Status da Sincronização com Supabase">
+      <span>●</span> <span id="syncStatusText">Modo Local (Offline)</span>
+    </div>
+    <div style="font-size:12px; color:var(--fab-yellow); font-family:'Roboto Mono',monospace;" id="tbUserMeta">FAB-SGA v3.0</div>
+  </div>
+</header>
+
+<!-- MAIN CONTENT WRAPPER -->
+<main>
+
+  <!-- DASHBOARD VIEW -->
+  <section id="view-dashboard" class="view-pane active">
+    <div class="header-banner">
+      <div class="hb-title">
+        <h1>Painel de Controle de Disponibilidade de EAS</h1>
+        <p>Monitoramento em tempo real da frota, calendário preventivo, histórico de panes e alertas de prontidão.</p>
+      </div>
+      <div class="hb-actions">
+        <button class="btn yellow" onclick="openModal('modalEquipment')">+ Novo EAS</button>
+        <button class="btn" onclick="openModal('modalPreventive')">+ Agendar Preventiva</button>
+        <button class="btn danger" onclick="openModal('modalCorrective')">+ Registrar Pane</button>
+      </div>
+    </div>
+
+    <!-- KPIS -->
+    <div class="kpi-grid">
+      <div class="kpi blue">
+        <div class="kpi-lbl">Total de Equipamentos</div>
+        <div class="kpi-val" id="kpiTotal">0</div>
+        <div class="kpi-sub">Cadastrados na Base</div>
+      </div>
+      <div class="kpi green">
+        <div class="kpi-lbl">Frota Operacional</div>
+        <div class="kpi-val" id="kpiOperacional">0</div>
+        <div class="kpi-sub"><span id="kpiOperacionalPct">0%</span> Disponibilidade</div>
+      </div>
+      <div class="kpi orange">
+        <div class="kpi-lbl">Preventivas Vencendo / Hoje</div>
+        <div class="kpi-val" id="kpiPreventivaVencendo">0</div>
+        <div class="kpi-sub">Calendário de Revisão</div>
+      </div>
+      <div class="kpi red">
+        <div class="kpi-lbl">Panes / Corretivas Abertas</div>
+        <div class="kpi-val" id="kpiCorretivasAbertas">0</div>
+        <div class="kpi-sub">Aguardando Reparo</div>
+      </div>
+    </div>
+
+    <!-- CHARTS ROW -->
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 28px;">
+      <div class="card" style="margin-bottom:0;">
+        <div class="card-head">
+          <h2>Disponibilidade por Categoria</h2>
+          <span class="tag">Distribuição da Frota</span>
+        </div>
+        <div style="height: 260px; position: relative;">
+          <canvas id="chartCategory"></canvas>
+        </div>
+      </div>
+      <div class="card" style="margin-bottom:0;">
+        <div class="card-head">
+          <h2>Status Operacional Consolidado</h2>
+          <span class="tag">Taxa Geral de Prontidão</span>
+        </div>
+        <div style="height: 260px; position: relative;">
+          <canvas id="chartStatus"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- ALERTAS ATIVOS & PREVENTIVAS PRÓXIMAS -->
+    <div class="card">
+      <div class="card-head">
+        <h2>Alertas Ativos (Calendário Preventivo & Panes Urgentes)</h2>
+        <span class="tag">Atenção Requerida</span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Alerta / Prioridade</th>
+              <th>Código / EAS</th>
+              <th>Equipamento</th>
+              <th>Base / OM</th>
+              <th>Data Limite / Ocorrência</th>
+              <th>Status Atual</th>
+              <th>Ações Rápidas</th>
+            </tr>
+          </thead>
+          <tbody id="dashAlertsBody">
+            <!-- Preenchido via JS -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- INVENTORY VIEW -->
+  <section id="view-inventory" class="view-pane">
+    <div class="header-banner">
+      <div class="hb-title">
+        <h1>Inventário de Equipamentos de Apoio de Solo (EAS)</h1>
+        <p>Gerenciamento completo das especificações, bases militares de alocação e estado operacional.</p>
+      </div>
+      <div class="hb-actions">
+        <button class="btn yellow" onclick="openModal('modalEquipment')">+ Cadastrar EAS</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="filter-row">
+        <input type="text" id="filterSearch" placeholder="Buscar por código, nome ou base..." oninput="renderInventory()">
+        <select id="filterStatus" onchange="renderInventory()">
+          <option value="">Todos os Status</option>
+          <option value="Operacional">Operacional</option>
+          <option value="Preventiva">Manutenção Preventiva</option>
+          <option value="Corretiva">Manutenção Corretiva</option>
+          <option value="Inoperante">Inoperante</option>
+        </select>
+        <select id="filterCategory" onchange="renderInventory()">
+          <option value="">Todas as Categorias</option>
+          <option value="GPU (Gerador de Partida)">GPU (Gerador de Partida)</option>
+          <option value="ACU (Ar Condicionado)">ACU (Ar Condicionado)</option>
+          <option value="Macaco Hidráulico">Macaco Hidráulico</option>
+          <option value="Trator de Reboque">Trator de Reboque</option>
+          <option value="Escada de Embarque">Escada de Embarque</option>
+        </select>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Código</th>
+              <th>Equipamento</th>
+              <th>Categoria</th>
+              <th>Base / OM</th>
+              <th>Próxima Preventiva</th>
+              <th>Status</th>
+              <th>Observações Técnicas</th>
+              <th style="text-align: right;">Ações</th>
+            </tr>
+          </thead>
+          <tbody id="inventoryTableBody">
+            <!-- Preenchido via JS -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- PREVENTIVE MAINTENANCE VIEW (CALENDAR) -->
+  <section id="view-preventive" class="view-pane">
+    <div class="header-banner">
+      <div class="hb-title">
+        <h1>Plano de Manutenção Preventiva (Calendário)</h1>
+        <p>Controle de manutenções periódicas baseadas em datas agendadas, com alertas automáticos de vencimento.</p>
+      </div>
+      <div class="hb-actions">
+        <button class="btn yellow" onclick="openModal('modalPreventive')">+ Agendar Preventiva</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h2>Cronograma de Manutenções Preventivas</h2>
+        <span class="tag">Calendário de Revisões</span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Data Agendada</th>
+              <th>EAS / Código</th>
+              <th>Equipamento</th>
+              <th>Base</th>
+              <th>Técnico / Responsável</th>
+              <th>Situação do Prazo</th>
+              <th>Observações</th>
+              <th style="text-align:right;">Ações</th>
+            </tr>
+          </thead>
+          <tbody id="preventiveTableBody">
+            <!-- Preenchido via JS -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- CORRECTIVE / PANES HISTORY VIEW -->
+  <section id="view-corrective" class="view-pane">
+    <div class="header-banner">
+      <div class="hb-title">
+        <h1>Histórico de Panes e Manutenção Corretiva</h1>
+        <p>Registro de falhas operacionais, tempo de paralisação e acompanhamento de reparos corretivos.</p>
+      </div>
+      <div class="hb-actions">
+        <button class="btn yellow" onclick="openModal('modalCorrective')">+ Registrar Nova Pane</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h2>Ocorrências e Panes Registradas</h2>
+        <span class="tag">Controle de Corretivas</span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Data da Pane</th>
+              <th>EAS / Código</th>
+              <th>Descrição do Problema / Pane</th>
+              <th>Técnico Responsável</th>
+              <th>Status do Reparo</th>
+              <th>Ações</th>
+            </tr>
+          </thead>
+          <tbody id="correctiveTableBody">
+            <!-- Preenchido via JS -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<!-- MODAL: CADASTRAR / EDITAR EAS -->
+<div class="modal-backdrop" id="modalEquipment">
+  <div class="modal">
+    <div class="modal-head">
+      <h3 id="modalEqTitle">Cadastrar Novo EAS</h3>
+      <button class="modal-close" onclick="closeModal('modalEquipment')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="eqEditId">
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Código / Patrimônio</label>
+          <input type="text" id="eqCode" placeholder="Ex: GPU-01, TR-12">
+        </div>
+        <div class="form-group">
+          <label>Nome do Equipamento</label>
+          <input type="text" id="eqName" placeholder="Ex: Gerador 90kVA Hobart">
+        </div>
+        <div class="form-group">
+          <label>Categoria</label>
+          <select id="eqCategory">
+            <option value="GPU (Gerador de Partida)">GPU (Gerador de Partida)</option>
+            <option value="ACU (Ar Condicionado)">ACU (Ar Condicionado)</option>
+            <option value="Macaco Hidráulico">Macaco Hidráulico</option>
+            <option value="Trator de Reboque">Trator de Reboque</option>
+            <option value="Escada de Embarque">Escada de Embarque</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Base / OM</label>
+          <input type="text" id="eqBase" placeholder="Ex: ALA 2, BAFYS, BASP">
+        </div>
+        <div class="form-group">
+          <label>Data da Próxima Preventiva (Calendário)</label>
+          <input type="date" id="eqProximaPreventiva">
+        </div>
+        <div class="form-group">
+          <label>Status Operacional</label>
+          <select id="eqStatus">
+            <option value="Operacional">Operacional</option>
+            <option value="Preventiva">Manutenção Preventiva</option>
+            <option value="Corretiva">Manutenção Corretiva</option>
+            <option value="Inoperante">Inoperante</option>
+          </select>
+        </div>
+        <div class="form-group full">
+          <label>Observações Técnicas / Restrições</label>
+          <textarea id="eqNotes" rows="2" placeholder="Informações adicionais sobre o estado do equipamento..."></textarea>
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn outline" style="color:var(--gray-700); border-color:var(--gray-300)" onclick="closeModal('modalEquipment')">Cancelar</button>
+      <button class="btn yellow" onclick="saveEquipment()">Salvar Equipamento</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: AGENDAR PREVENTIVA -->
+<div class="modal-backdrop" id="modalPreventive">
+  <div class="modal">
+    <div class="modal-head">
+      <h3>Agendar / Atualizar Manutenção Preventiva</h3>
+      <button class="modal-close" onclick="closeModal('modalPreventive')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group full">
+          <label>Selecionar Equipamento</label>
+          <select id="prevEqCode">
+            <!-- Preenchido via JS -->
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Data Agendada para a Preventiva</label>
+          <input type="date" id="prevDate">
+        </div>
+        <div class="form-group">
+          <label>Técnico / Equipe Responsável</label>
+          <input type="text" id="prevTech" placeholder="Ex: Sgt Mec. Oliveira">
+        </div>
+        <div class="form-group full">
+          <label>Escopo da Revisão / Descrição</label>
+          <textarea id="prevDesc" rows="2" placeholder="Ex: Troca de filtros, óleos e verificação elétrica..."></textarea>
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn outline" style="color:var(--gray-700); border-color:var(--gray-300)" onclick="closeModal('modalPreventive')">Cancelar</button>
+      <button class="btn yellow" onclick="savePreventive()">Salvar Agendamento</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: REGISTRAR PANE / CORRETIVA -->
+<div class="modal-backdrop" id="modalCorrective">
+  <div class="modal">
+    <div class="modal-head">
+      <h3>Registrar Pane ou Manutenção Corretiva</h3>
+      <button class="modal-close" onclick="closeModal('modalCorrective')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="corrEditId">
+      <div class="form-grid">
+        <div class="form-group full">
+          <label>Selecionar Equipamento</label>
+          <select id="corrEqCode">
+            <!-- Preenchido via JS -->
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Data da Ocorrência da Pane</label>
+          <input type="date" id="corrDate">
+        </div>
+        <div class="form-group">
+          <label>Status do Reparo</label>
+          <select id="corrStatus">
+            <option value="Aberta">Aberta (Pane Recém Detectada)</option>
+            <option value="Em Andamento">Em Andamento (Manutenção Corretiva)</option>
+            <option value="Solucionada">Solucionada (Equipamento Operacional)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Técnico Responsável pelo Diagnóstico</label>
+          <input type="text" id="corrTech" placeholder="Ex: Sgt Especialista Santos">
+        </div>
+        <div class="form-group full">
+          <label>Descrição Detalhada da Pane / Diagnóstico</label>
+          <textarea id="corrDesc" rows="3" placeholder="Relate o defeito apresentado, peças substituídas..."></textarea>
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn outline" style="color:var(--gray-700); border-color:var(--gray-300)" onclick="closeModal('modalCorrective')">Cancelar</button>
+      <button class="btn yellow" onclick="saveCorrective()">Salvar Registro de Pane</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST CONTAINER -->
+<div id="toastContainer"></div>
+
+<script>
+  // CONFIGURAÇÃO SUPABASE E ESTADO GLOBAL
+  let authMode = localStorage.getItem('sga_auth_mode') || 'local'; // 'supabase' ou 'local'
+  let supabaseUrl = localStorage.getItem('sga_supabase_url') || '';
+  let supabaseKey = localStorage.getItem('sga_supabase_key') || '';
+  let supabaseClient = null;
+
+  let currentUser = JSON.parse(localStorage.getItem('sga_current_user')) || null;
+
+  // DADOS DE MEMÓRIA (FALLBACK / MOCK INICIAL)
+  let equipments = [
+    { id: '1', code: 'GPU-01', name: 'Gerador de Partida 90kVA', category: 'GPU (Gerador de Partida)', base: 'ALA 2 - Anápolis', proxima_preventiva: '2026-06-20', status: 'Operacional', notes: 'Funcionamento normal em apoio a caças.' },
+    { id: '2', code: 'GPU-02', name: 'Gerador de Partida 60kVA', category: 'GPU (Gerador de Partida)', base: 'ALA 1 - Brasília', proxima_preventiva: '2026-06-12', status: 'Preventiva', notes: 'Revisão periódica agendada.' },
+    { id: '3', code: 'ACU-04', name: 'Unidade de Ar Condicionado Ar-Solo', category: 'ACU (Ar Condicionado)', base: 'ALA 2 - Anápolis', proxima_preventiva: '2026-07-05', status: 'Operacional', notes: 'Revisado recentemente.' },
+    { id: '4', code: 'MAC-12', name: 'Macaco Hidráulico 15 Ton', category: 'Macaco Hidráulico', base: 'BAFYS - Afonsos', proxima_preventiva: '2026-06-10', status: 'Operacional', notes: 'Sem vazamentos.' },
+    { id: '5', code: 'TR-03', name: 'Trator de Reboque Pesado', category: 'Trator de Reboque', base: 'ALA 1 - Brasília', proxima_preventiva: '2026-05-30', status: 'Corretiva', notes: 'Aguardando câmbio.' },
+    { id: '6', code: 'ESC-01', name: 'Escada de Embarque Ajustável', category: 'Escada de Embarque', base: 'BASP - São Paulo', proxima_preventiva: '2026-08-15', status: 'Operacional', notes: 'Rodízios lubrificados.' }
+  ];
+
+  let preventivas = [
+    { id: 'p1', eqCode: 'GPU-02', date: '2026-06-12', tech: 'Sgt Mec. Carlos', desc: 'Troca de filtros e óleo do motor diesel.', status: 'Pendente' },
+    { id: 'p2', eqCode: 'MAC-12', date: '2026-06-10', tech: 'Sgt Hidráulica Souza', desc: 'Teste de pressão e carga máxima.', status: 'Vencido' },
+    { id: 'p3', eqCode: 'GPU-01', date: '2026-06-20', tech: 'Cb Elétrica Lima', desc: 'Inspeção do painel de controle 400Hz.', status: 'Agendado' }
+  ];
+
+  let correctivePanes = [
+    { id: 'c1', eqCode: 'TR-03', date: '2026-06-08', tech: 'Terc. Mecânica Oficina', desc: 'Falha na transmissão automática durante reboque de aeronave C-99.', status: 'Em Andamento' }
+  ];
+
+  let chartCategoryInstance = null;
+  let chartStatusInstance = null;
+
+  // INICIALIZAÇÃO DO APP
+  window.addEventListener('DOMContentLoaded', async () => {
+    // Preencher campos de config se existirem
+    if(document.getElementById('supabaseUrlInput')) {
+      document.getElementById('supabaseUrlInput').value = supabaseUrl;
+      document.getElementById('supabaseKeyInput').value = supabaseKey;
+    }
+
+    if(currentUser) {
+      initAppSession();
+    } else {
+      toggleAuthMode(authMode);
+    }
+  });
+
+  function toggleAuthMode(mode) {
+    authMode = mode;
+    const configForm = document.getElementById('supabaseConfigForm');
+    const supBtn = document.getElementById('modeSupabaseBtn');
+    const locBtn = document.getElementById('modeLocalBtn');
+
+    if(mode === 'supabase') {
+      configForm.style.display = 'block';
+      supBtn.className = 'btn sm yellow';
+      locBtn.className = 'btn sm outline';
+      locBtn.style.color = 'var(--fab-blue)';
+      locBtn.style.borderColor = 'var(--fab-blue)';
+    } else {
+      configForm.style.display = 'none';
+      locBtn.className = 'btn sm yellow';
+      supBtn.className = 'btn sm outline';
+      supBtn.style.color = 'var(--fab-blue)';
+      supBtn.style.borderColor = 'var(--fab-blue)';
+    }
+  }
+
+  async function handleLogin() {
+    const email = document.getElementById('authEmail').value.trim();
+    if(!email) {
+      showToast('Informe sua identificação ou e-mail.');
+      return;
+    }
+
+    if(authMode === 'supabase') {
+      supabaseUrl = document.getElementById('supabaseUrlInput').value.trim();
+      supabaseKey = document.getElementById('supabaseKeyInput').value.trim();
+      if(!supabaseUrl || !supabaseKey) {
+        showToast('Insira a Supabase URL e Anon Key válidas.');
+        return;
+      }
+      localStorage.setItem('sga_supabase_url', supabaseUrl);
+      localStorage.setItem('sga_supabase_key', supabaseKey);
+
+      try {
+        supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey);
+        // Testar conexão buscando equipamentos
+        const { data, error } = await supabaseClient.from('eas_equipamentos').select('*').limit(1);
+        if(error && error.code !== 'PGRST116') {
+          console.warn('Erro Supabase, fallback local:', error.message);
+        }
+      } catch(err) {
+        console.error('Falha ao instanciar Supabase:', err);
+      }
+    }
+
+    localStorage.setItem('sga_auth_mode', authMode);
+    currentUser = { email, name: email.split('@')[0].toUpperCase() };
+    localStorage.setItem('sga_current_user', JSON.stringify(currentUser));
+
+    initAppSession();
+    showToast('Sessão iniciada com sucesso.');
+  }
+
+  function handleLogout() {
+    localStorage.removeItem('sga_current_user');
+    currentUser = null;
+    document.body.classList.remove('logged-in');
+    document.getElementById('authScreen').style.display = 'flex';
+  }
+
+  async function initAppSession() {
+    document.body.classList.add('logged-in');
+    document.getElementById('authScreen').style.display = 'none';
+    document.getElementById('userNameDisplay').innerHTML = `<b>${currentUser.name}</b>`;
+    document.getElementById('userAvatarText').innerText = currentUser.name.substring(0, 2);
+
+    const syncBadge = document.getElementById('syncStatusBadge');
+    const syncText = document.getElementById('syncStatusText');
+
+    if(authMode === 'supabase' && supabaseUrl && supabaseKey) {
+      syncBadge.className = 'tb-sync-badge online';
+      syncText.innerText = 'Supabase Conectado (Equipe)';
+      await fetchSupabaseData();
+    } else {
+      syncBadge.className = 'tb-sync-badge offline';
+      syncText.innerText = 'Modo Demonstração (Local)';
+    }
+
+    // Definir data padrão hoje nos formulários
+    const today = new Date().toISOString().split('T')[0];
+    if(document.getElementById('prevDate')) document.getElementById('prevDate').value = today;
+    if(document.getElementById('corrDate')) document.getElementById('corrDate').value = today;
+
+    refreshAll();
+  }
+
+  // SINCRONIZAÇÃO SUPABASE (TABELAS: eas_equipamentos, eas_manutencoes, eas_panes_historico)
+  async function fetchSupabaseData() {
+    if(!supabaseClient) return;
+    try {
+      const resEq = await supabaseClient.from('eas_equipamentos').select('*');
+      if(resEq.data && resEq.data.length > 0) equipments = resEq.data;
+
+      const resPrev = await supabaseClient.from('eas_manutencoes').select('*');
+      if(resPrev.data && resPrev.data.length > 0) preventivas = resPrev.data;
+
+      const resCorr = await supabaseClient.from('eas_panes_historico').select('*');
+      if(resCorr.data && resCorr.data.length > 0) correctivePanes = resCorr.data;
+    } catch(err) {
+      console.error('Erro ao buscar dados do Supabase:', err);
+    }
+  }
+
+  async function syncSaveEquipmentToSupabase(eq) {
+    if(authMode !== 'supabase' || !supabaseClient) return;
+    try {
+      await supabaseClient.from('eas_equipamentos').upsert([eq]);
+    } catch(err) { console.error('Erro sync eq:', err); }
+  }
+
+  async function syncDeleteEquipmentFromSupabase(id) {
+    if(authMode !== 'supabase' || !supabaseClient) return;
+    try {
+      await supabaseClient.from('eas_equipamentos').delete().eq('id', id);
+    } catch(err) { console.error('Erro delete eq:', err); }
+  }
+
+  // NAVEGAÇÃO
+  function switchView(viewId, el) {
+    document.querySelectorAll('.view-pane').forEach(p => p.classList.remove('active'));
+    document.getElementById('view-' + viewId).classList.add('active');
+
+    document.querySelectorAll('#sideNav .sn-item').forEach(i => i.classList.remove('active'));
+    if(el) el.classList.add('active');
+
+    const viewNames = {
+      dashboard: 'Dashboard de Disponibilidade',
+      inventory: 'Inventário de EAS',
+      preventive: 'Plano Preventivo por Calendário',
+      corrective: 'Histórico de Panes e Corretivas'
+    };
+    document.getElementById('tbCurrentViewName').innerText = viewNames[viewId] || 'Gestão';
+  }
+
+  // MODAIS
+  function openModal(modalId) {
+    document.getElementById(modalId).classList.add('open');
+    if(modalId === 'modalEquipment') {
+      document.getElementById('eqEditId').value = '';
+      document.getElementById('modalEqTitle').innerText = 'Cadastrar Novo EAS';
+      document.getElementById('eqCode').value = '';
+      document.getElementById('eqName').value = '';
+      document.getElementById('eqNotes').value = '';
+      document.getElementById('eqProximaPreventiva').value = new Date().toISOString().split('T')[0];
+    }
+    populateSelects();
+  }
+  function closeModal(modalId) {
+    document.getElementById(modalId).classList.remove('open');
+  }
+
+  function showToast(msg) {
+    const container = document.getElementById('toastContainer');
+    const toast = document.createElement('div');
+    toast.className = 'toast';
+    toast.innerText = msg;
+    container.appendChild(toast);
+    setTimeout(() => {
+      toast.style.opacity = '0';
+      setTimeout(() => toast.remove(), 200);
+    }, 3000);
+  }
+
+  function refreshAll() {
+    updateKPIs();
+    renderDashboardAlerts();
+    renderInventory();
+    renderPreventiveTable();
+    renderCorrectiveTable();
+    populateSelects();
+    renderCharts();
+  }
+
+  // POPULAR SELECTS
+  function populateSelects() {
+    const prevSelect = document.getElementById('prevEqCode');
+    const corrSelect = document.getElementById('corrEqCode');
+    
+    let opts = '';
+    equipments.forEach(e => {
+      opts += `<option value="${e.code}">${e.code} - ${e.name} (${e.base})</option>`;
+    });
+    if(prevSelect) prevSelect.innerHTML = opts;
+    if(corrSelect) corrSelect.innerHTML = opts;
+  }
+
+  // KPIS
+  function updateKPIs() {
+    const total = equipments.length;
+    const operacional = equipments.filter(e => e.status === 'Operacional').length;
+    const opPct = total > 0 ? Math.round((operacional / total) * 100) : 0;
+
+    const todayStr = new Date().toISOString().split('T')[0];
+    // Preventivas vencidas ou vencendo hoje
+    const prevVencendo = preventivas.filter(p => p.status !== 'Concluído' && p.date <= todayStr).length;
+    const corretivasAbertas = correctivePanes.filter(c => c.status !== 'Solucionada').length;
+
+    document.getElementById('kpiTotal').innerText = total;
+    document.getElementById('kpiOperacional').innerText = operacional;
+    document.getElementById('kpiOperacionalPct').innerText = opPct + '%';
+    document.getElementById('kpiPreventivaVencendo').innerText = prevVencendo;
+    document.getElementById('kpiCorretivasAbertas').innerText = corretivasAbertas;
+  }
+
+  // CRUD EQUIPAMENTOS
+  function saveEquipment() {
+    const editId = document.getElementById('eqEditId').value;
+    const code = document.getElementById('eqCode').value.trim();
+    const name = document.getElementById('eqName').value.trim();
+    const category = document.getElementById('eqCategory').value;
+    const base = document.getElementById('eqBase').value.trim();
+    const proxima_preventiva = document.getElementById('eqProximaPreventiva').value;
+    const status = document.getElementById('eqStatus').value;
+    const notes = document.getElementById('eqNotes').value.trim();
+
+    if(!code || !name || !base) {
+      showToast('Preencha os campos obrigatórios (Código, Nome, Base).');
+      return;
+    }
+
+    if(editId) {
+      const eq = equipments.find(x => x.id === editId);
+      if(eq) {
+        eq.code = code; eq.name = name; eq.category = category; eq.base = base;
+        eq.proxima_preventiva = proxima_preventiva; eq.status = status; eq.notes = notes;
+        syncSaveEquipmentToSupabase(eq);
+      }
+      showToast('Equipamento atualizado.');
+    } else {
+      if(equipments.some(x => x.code === code)) {
+        showToast('Já existe EAS com este código.');
+        return;
+      }
+      const newEq = {
+        id: Date.now().toString(),
+        code, name, category, base, proxima_preventiva, status, notes
+      };
+      equipments.push(newEq);
+      syncSaveEquipmentToSupabase(newEq);
+      showToast('Novo EAS cadastrado com sucesso.');
+    }
+
+    closeModal('modalEquipment');
+    refreshAll();
+  }
+
+  function editEquipment(id) {
+    const eq = equipments.find(x => x.id === id);
+    if(!eq) return;
+    document.getElementById('eqEditId').value = eq.id;
+    document.getElementById('modalEqTitle').innerText = 'Editar EAS: ' + eq.code;
+    document.getElementById('eqCode').value = eq.code;
+    document.getElementById('eqName').value = eq.name;
+    document.getElementById('eqCategory').value = eq.category;
+    document.getElementById('eqBase').value = eq.base;
+    document.getElementById('eqProximaPreventiva').value = eq.proxima_preventiva || '';
+    document.getElementById('eqStatus').value = eq.status;
+    document.getElementById('eqNotes').value = eq.notes;
+    openModal('modalEquipment');
+  }
+
+  function deleteEquipment(id) {
+    const eq = equipments.find(x => x.id === id);
+    if(eq) syncDeleteEquipmentFromSupabase(eq.id);
+    equipments = equipments.filter(x => x.id !== id);
+    showToast('Equipamento removido.');
+    refreshAll();
+  }
+
+  // PREVENTIVAS
+  function savePreventive() {
+    const eqCode = document.getElementById('prevEqCode').value;
+    const date = document.getElementById('prevDate').value;
+    const tech = document.getElementById('prevTech').value.trim();
+    const desc = document.getElementById('prevDesc').value.trim();
+
+    if(!date) {
+      showToast('Selecione a data da preventiva.');
+      return;
+    }
+
+    const todayStr = new Date().toISOString().split('T')[0];
+    let status = 'Agendado';
+    if(date < todayStr) status = 'Vencido';
+    else if(date === todayStr) status = 'Pendente';
+
+    const newPrev = {
+      id: Date.now().toString(),
+      eqCode, date, tech, desc, status
+    };
+    preventivas.unshift(newPrev);
+
+    // Atualizar data no EAS correspondente
+    const eq = equipments.find(x => x.code === eqCode);
+    if(eq) {
+      eq.proxima_preventiva = date;
+      eq.status = 'Preventiva';
+      syncSaveEquipmentToSupabase(eq);
+    }
+
+    closeModal('modalPreventive');
+    showToast('Manutenção preventiva agendada.');
+    refreshAll();
+  }
+
+  function completePreventive(id) {
+    const p = preventivas.find(x => x.id === id);
+    if(p) {
+      p.status = 'Concluído';
+      // Retornar EAS para operacional
+      const eq = equipments.find(x => x.code === p.eqCode);
+      if(eq) {
+        eq.status = 'Operacional';
+        syncSaveEquipmentToSupabase(eq);
+      }
+      showToast('Manutenção preventiva marcada como concluída.');
+      refreshAll();
+    }
+  }
+
+  // PANES / CORRETIVAS
+  function saveCorrective() {
+    const eqCode = document.getElementById('corrEqCode').value;
+    const date = document.getElementById('corrDate').value;
+    const status = document.getElementById('corrStatus').value;
+    const tech = document.getElementById('corrTech').value.trim();
+    const desc = document.getElementById('corrDesc').value.trim();
+
+    if(!desc) {
+      showToast('Descreva a pane ocorrida.');
+      return;
+    }
+
+    const newCorr = {
+      id: Date.now().toString(),
+      eqCode, date, status, tech, desc
+    };
+    correctivePanes.unshift(newCorr);
+
+    // Atualizar status do EAS
+    const eq = equipments.find(x => x.code === eqCode);
+    if(eq) {
+      if(status === 'Solucionada') {
+        eq.status = 'Operacional';
+      } else {
+        eq.status = 'Corretiva';
+      }
+      syncSaveEquipmentToSupabase(eq);
+    }
+
+    closeModal('modalCorrective');
+    showToast('Registro de pane salvo.');
+    refreshAll();
+  }
+
+  function resolveCorrective(id) {
+    const c = correctivePanes.find(x => x.id === id);
+    if(c) {
+      c.status = 'Solucionada';
+      const eq = equipments.find(x => x.code === c.eqCode);
+      if(eq) {
+        eq.status = 'Operacional';
+        syncSaveEquipmentToSupabase(eq);
+      }
+      showToast('Pane solucionada e equipamento retornado à frota.');
+      refreshAll();
+    }
+  }
+
+  // RENDERIZAR TABELAS
+  function renderDashboardAlerts() {
+    const tbody = document.getElementById('dashAlertsBody');
+    const todayStr = new Date().toISOString().split('T')[0];
+    
+    let html = '';
+    // Pegar preventivas vencidas ou pendentes hoje
+    preventivas.filter(p => p.status !== 'Concluído').forEach(p => {
+      const eq = equipments.find(x => x.code === p.eqCode) || { name: 'Desconhecido', base: '-' };
+      const isVencido = p.date < todayStr;
+      const badgeType = isVencido ? 'vencido' : 'preventiva';
+      const label = isVencido ? 'Preventiva Vencida' : 'Preventiva Hoje/Próxima';
+
+      html += `
+        <tr>
+          <td><span class="badge ${badgeType}">${label}</span></td>
+          <td style="font-family:'Roboto Mono',monospace; font-weight:600; color:var(--fab-blue);">${p.eqCode}</td>
+          <td><b>${eq.name}</b></td>
+          <td>${eq.base}</td>
+          <td style="font-family:'Roboto Mono',monospace;">${p.date}</td>
+          <td><span class="badge preventiva">Preventiva</span></td>
+          <td><button class="btn sm yellow" onclick="completePreventive('${p.id}')">Concluir</button></td>
+        </tr>
+      `;
+    });
+
+    // Pegar corretivas abertas
+    correctivePanes.filter(c => c.status !== 'Solucionada').forEach(c => {
+      const eq = equipments.find(x => x.code === c.eqCode) || { name: 'Desconhecido', base: '-' };
+      html += `
+        <tr>
+          <td><span class="badge urgente">Pane Urgente</span></td>
+          <td style="font-family:'Roboto Mono',monospace; font-weight:600; color:var(--fab-blue);">${c.eqCode}</td>
+          <td><b>${eq.name}</b></td>
+          <td>${eq.base}</td>
+          <td style="font-family:'Roboto Mono',monospace;">${c.date}</td>
+          <td><span class="badge corretiva">Corretiva</span></td>
+          <td><button class="btn sm success" onclick="resolveCorrective('${c.id}')">Solucionar</button></td>
+        </tr>
+      `;
+    });
+
+    tbody.innerHTML = html || '<tr><td colspan="7" style="text-align:center; padding:25px; color:var(--gray-500);">Nenhum alerta ativo no momento. Frota 100% pronta.</td></tr>';
+  }
+
+  function renderInventory() {
+    const search = document.getElementById('filterSearch').value.toLowerCase();
+    const statusFilter = document.getElementById('filterStatus').value;
+    const catFilter = document.getElementById('filterCategory').value;
+
+    const tbody = document.getElementById('inventoryTableBody');
+    const filtered = equipments.filter(e => {
+      const matchSearch = e.code.toLowerCase().includes(search) || e.name.toLowerCase().includes(search) || e.base.toLowerCase().includes(search);
+      const matchStatus = !statusFilter || e.status === statusFilter;
+      const matchCat = !catFilter || e.category === catFilter;
+      return matchSearch && matchStatus && matchCat;
+    });
+
+    let html = '';
+    filtered.forEach(e => {
+      const badgeClass = e.status.toLowerCase().includes('preventiva') ? 'preventiva' : (e.status.toLowerCase().includes('operacional') ? 'operacional' : (e.status.toLowerCase().includes('inoperante') ? 'inoperante' : 'corretiva'));
+      html += `
+        <tr>
+          <td style="font-family:'Roboto Mono',monospace; font-weight:600; color:var(--fab-blue);">${e.code}</td>
+          <td><b>${e.name}</b></td>
+          <td><span style="font-size:11px; background:var(--gray-100); padding:2px 6px; border-radius:2px;">${e.category}</span></td>
+          <td>${e.base}</td>
+          <td style="font-family:'Roboto Mono',monospace;">${e.proxima_preventiva || '-'}</td>
+          <td><span class="badge ${badgeClass}">${e.status}</span></td>
+          <td style="max-width:180px; text-overflow:ellipsis; overflow:hidden;" title="${e.notes}">${e.notes || '-'}</td>
+          <td style="text-align: right;">
+            <button class="btn sm outline" style="color:var(--fab-blue); border-color:var(--fab-blue);" onclick="editEquipment('${e.id}')">Editar</button>
+            <button class="btn sm danger" onclick="deleteEquipment('${e.id}')">Excluir</button>
+          </td>
+        </tr>
+      `;
+    });
+    tbody.innerHTML = html || '<tr><td colspan="8" style="text-align:center; padding:30px; color:var(--gray-500);">Nenhum equipamento encontrado.</td></tr>';
+  }
+
+  function renderPreventiveTable() {
+    const tbody = document.getElementById('preventiveTableBody');
+    const todayStr = new Date().toISOString().split('T')[0];
+
+    let html = '';
+    preventivas.forEach(p => {
+      const eq = equipments.find(x => x.code === p.eqCode) || { name: 'Desconhecido', base: '-' };
+      let prazoBadge = '<span class="badge operacional">No Prazo</span>';
+      if(p.status === 'Concluído') prazoBadge = '<span class="badge operacional">Concluído</span>';
+      else if(p.date < todayStr) prazoBadge = '<span class="badge vencido">Vencido</span>';
+
+      html += `
+        <tr>
+          <td style="font-family:'Roboto Mono',monospace; font-weight:600;">${p.date}</td>
+          <td style="font-family:'Roboto Mono',monospace; color:var(--fab-blue);">${p.eqCode}</td>
+          <td><b>${eq.name}</b></td>
+          <td>${eq.base}</td>
+          <td>${p.tech || 'Equipe Manutenção'}</td>
+          <td>${prazoBadge}</td>
+          <td>${p.desc}</td>
+          <td style="text-align:right;">
+            ${p.status !== 'Concluído' ? `<button class="btn sm yellow" onclick="completePreventive('${p.id}')">Concluir</button>` : '<span style="color:var(--green); font-size:11px; font-weight:600;">Feito</span>'}
+          </td>
+        </tr>
+      `;
+    });
+    tbody.innerHTML = html || '<tr><td colspan="8" style="text-align:center; padding:25px; color:var(--gray-500);">Nenhuma manutenção preventiva agendada.</td></tr>';
+  }
+
+  function renderCorrectiveTable() {
+    const tbody = document.getElementById('correctiveTableBody');
+    let html = '';
+    correctivePanes.forEach(c => {
+      const eq = equipments.find(x => x.code === c.eqCode) || { name: 'Desconhecido' };
+      const badgeCl = c.status === 'Solucionada' ? 'operacional' : 'corretiva';
+      html += `
+        <tr>
+          <td style="font-family:'Roboto Mono',monospace;">${c.date}</td>
+          <td style="font-family:'Roboto Mono',monospace; color:var(--fab-blue); font-weight:600;">${c.eqCode}</td>
+          <td><b>${eq.name}</b><br><small style="color:var(--gray-500);">${c.desc}</small></td>
+          <td>${c.tech || 'Especialista'}</td>
+          <td><span class="badge ${badgeCl}">${c.status}</span></td>
+          <td>
+            ${c.status !== 'Solucionada' ? `<button class="btn sm success" onclick="resolveCorrective('${c.id}')">Solucionar</button>` : '<span style="color:var(--green); font-size:11px;">Resolvido</span>'}
+          </td>
+        </tr>
+      `;
+    });
+    tbody.innerHTML = html || '<tr><td colspan="6" style="text-align:center; padding:25px; color:var(--gray-500);">Nenhuma pane registrada.</td></tr>';
+  }
+
+  // GRÁFICOS (CHART.JS)
+  function renderCharts() {
+    // 1. Categoria
+    const categories = ['GPU (Gerador de Partida)', 'ACU (Ar Condicionado)', 'Macaco Hidráulico', 'Trator de Reboque', 'Escada de Embarque'];
+    const catCounts = categories.map(cat => equipments.filter(e => e.category === cat).length);
+
+    const ctxCat = document.getElementById('chartCategory').getContext('2d');
+    if(chartCategoryInstance) chartCategoryInstance.destroy();
+
+    chartCategoryInstance = new Chart(ctxCat, {
+      type: 'bar',
+      data: {
+        labels: ['GPU', 'ACU', 'Macacos', 'Tratores', 'Escadas'],
+        datasets: [{
+          label: 'Qtd',
+          data: catCounts,
+          backgroundColor: '#2B3F53',
+          borderRadius: 2
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }
+      }
+    });
+
+    // 2. Status
+    const opCount = equipments.filter(e => e.status === 'Operacional').length;
+    const prevCount = equipments.filter(e => e.status === 'Preventiva').length;
+    const corrCount = equipments.filter(e => e.status === 'Corretiva' || e.status === 'Inoperante').length;
+
+    const ctxStatus = document.getElementById('chartStatus').getContext('2d');
+    if(chartStatusInstance) chartStatusInstance.destroy();
+
+    chartStatusInstance = new Chart(ctxStatus, {
+      type: 'doughnut',
+      data: {
+        labels: ['Operacional', 'Em Preventiva', 'Corretiva / Inoperante'],
+        datasets: [{
+          data: [opCount, prevCount, corrCount],
+          backgroundColor: ['#00A651', '#FFCC00', '#C8102E']
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { family: 'Roboto', size: 11 } } } }
+      }
+    });
+  }
+
+  // EXPORTAR CSV
+  function exportDataCSV() {
+    let csvContent = "data:text/csv;charset=utf-8,Codigo;Nome;Categoria;Base;ProximaPreventiva;Status;Observacoes\r\n";
+    equipments.forEach(e => {
+      csvContent += `"${e.code}";"${e.name}";"${e.category}";"${e.base}";"${e.proxima_preventiva}";"${e.status}";"${e.notes}"\r\n`;
+    });
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", "inventario_eas_fab.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    showToast('Relatório CSV exportado.');
+  }
+</script>
+</body>
+</html>
