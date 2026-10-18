@@ -11,6 +11,7 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" defer></script>
 <!-- Supabase JS Client v2 -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
   :root {
     --fab-blue: #2B3F53;
@@ -289,11 +290,11 @@
 
       <div class="form-group">
         <label>E-mail ou Identificação Militar / Graduação</label>
-        <input type="text" id="authEmail" placeholder="Ex: Cap Aviador Silva / sga@fab.mil.br" value="cel.mota@fab.mil.br">
+        <input type="text" id="authEmail" placeholder="Ex: Cap Aviador Silva / sga@fab.mil.br">
       </div>
       <div class="form-group" style="margin-bottom:20px;">
         <label>Senha de Acesso</label>
-        <input type="password" id="authPassword" placeholder="••••••••" value="fab2026">
+        <input type="password" id="authPassword" placeholder="••••••••">
       </div>
 
       <button class="btn yellow" style="width:100%; justify-content:center; padding:12px;" onclick="handleLogin()">Acessar Painel GEDEAS</button>
@@ -423,6 +424,16 @@
           <canvas id="chartStatus"></canvas>
         </div>
       </div>
+    </div>
+
+    <!-- PANES POR NATUREZA -->
+    <div class="card">
+      <div class="card-head">
+        <h2>Panes por Natureza</h2>
+        <button type="button" onclick="generateNatureReport()" style="padding:7px 14px;border-radius:8px;border:0;background:#1d4ed8;color:#fff;font-weight:600;cursor:pointer;">Gerar relatório PDF</button>
+      </div>
+      <div id="natureSummary" style="font-size:13px;margin-bottom:10px;"></div>
+      <div style="height: 240px; position: relative;"><canvas id="chartNature"></canvas></div>
     </div>
 
     <!-- ALERTAS ATIVOS & PREVENTIVAS PRÓXIMAS -->
@@ -604,13 +615,8 @@
         </div>
         <div class="form-group">
           <label>Categoria</label>
-          <select id="eqCategory">
-            <option value="GPU (Gerador de Partida)">GPU (Gerador de Partida)</option>
-            <option value="ACU (Ar Condicionado)">ACU (Ar Condicionado)</option>
-            <option value="Macaco Hidráulico">Macaco Hidráulico</option>
-            <option value="Trator de Reboque">Trator de Reboque</option>
-            <option value="Escada de Embarque">Escada de Embarque</option>
-          </select>
+          <input type="text" id="eqCategory" list="eqCategoryList" placeholder="Escolha da lista ou digite uma nova categoria">
+          <datalist id="eqCategoryList"></datalist>
         </div>
         <div class="form-group">
           <label>Base / OM</label>
@@ -709,6 +715,17 @@
         <div class="form-group">
           <label>Técnico Responsável pelo Diagnóstico</label>
           <input type="text" id="corrTech" placeholder="Ex: Sgt Especialista Santos">
+        </div>
+        <div class="form-group">
+          <label>Natureza da Pane</label>
+          <select id="corrNature" onchange="toggleNatureOther()">
+            <option>Elétrica</option><option>Mecânica</option><option>Pneumática</option>
+            <option>Eletrônica</option><option>Hidráulica</option><option>Outro</option>
+          </select>
+        </div>
+        <div class="form-group" id="corrNatureOtherWrap" style="display:none">
+          <label>Qual a natureza? (Outro)</label>
+          <input type="text" id="corrNatureOther" placeholder="Ex: Estrutural, combustível...">
         </div>
         <div class="form-group full">
           <label>Descrição Detalhada da Pane / Diagnóstico</label>
@@ -941,7 +958,72 @@
     }, 3000);
   }
 
+
+  // ===== NATUREZA DA PANE, CATEGORIAS LIVRES E RELATÓRIO =====
+  function toggleNatureOther() {
+    document.getElementById('corrNatureOtherWrap').style.display =
+      document.getElementById('corrNature').value === 'Outro' ? 'block' : 'none';
+  }
+  function fillCategoryList() {
+    const base = ['GPU (Gerador de Partida)','ACU (Ar Condicionado)','Macaco Hidráulico','Trator de Reboque','Escada de Embarque'];
+    const all = [...new Set([...base, ...equipments.map(e => e.category).filter(Boolean)])];
+    const dl = document.getElementById('eqCategoryList');
+    if(dl) dl.innerHTML = all.map(c => '<option value="' + c.replace(/&/g,'&amp;').replace(/"/g,'&quot;') + '">').join('');
+  }
+  function natureStats() {
+    const c = {};
+    correctivePanes.forEach(p => { const k = p.natureza || 'Não informada'; c[k] = (c[k] || 0) + 1; });
+    const total = correctivePanes.length;
+    return { total, rows: Object.entries(c).sort((a,b) => b[1]-a[1]).map(([k,n]) => ({ k, n, pct: total ? n/total*100 : 0 })) };
+  }
+  let chartNatureInstance = null;
+  function renderNatureChart() {
+    const cv = document.getElementById('chartNature'); if(!cv || typeof Chart === 'undefined') return;
+    const s = natureStats();
+    if(chartNatureInstance) chartNatureInstance.destroy();
+    chartNatureInstance = new Chart(cv, {
+      type: 'bar',
+      data: { labels: s.rows.map(r => r.k + ' (' + r.pct.toFixed(0) + '%)'), datasets: [{ data: s.rows.map(r => r.n), backgroundColor: '#2563eb' }] },
+      options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true, ticks: { precision: 0 } } } }
+    });
+    document.getElementById('natureSummary').textContent = s.total
+      ? s.total + ' pane(s) registrada(s). Natureza mais frequente: ' + s.rows[0].k + ' (' + s.rows[0].pct.toFixed(1) + '%).'
+      : 'Nenhuma pane registrada.';
+  }
+  function generateNatureReport() {
+    if(!window.jspdf) { showToast('Biblioteca de PDF não carregada.'); return; }
+    const d = new window.jspdf.jsPDF({ unit: 'mm', format: 'a4' });
+    const s = natureStats(); let y = 18;
+    const chk = () => { if(y > 272) { d.addPage(); y = 18; } };
+    const h = t => { chk(); y += 4; d.setFont('helvetica','bold'); d.setFontSize(11); d.text(t, 14, y); y += 6; d.setFont('helvetica','normal'); d.setFontSize(10); };
+    d.setFont('helvetica','bold'); d.setFontSize(14); d.text('RELATÓRIO DE PANES POR NATUREZA — EAS', 14, y); y += 7;
+    d.setFont('helvetica','normal'); d.setFontSize(9);
+    d.text('Emitido em ' + new Date().toLocaleDateString('pt-BR') + '  |  Panes registradas: ' + s.total + '  |  EAS cadastrados: ' + equipments.length, 14, y); y += 6;
+    h('Distribuição por natureza');
+    s.rows.forEach(r => {
+      chk(); d.text(r.k, 14, y + 4); d.setFillColor(37,99,235); d.rect(50, y, Math.max(0.5, r.pct * 1.1), 5, 'F');
+      d.text(r.n + ' (' + r.pct.toFixed(1) + '%)', 50 + r.pct * 1.1 + 3, y + 4); y += 8;
+    });
+    const out = {};
+    correctivePanes.filter(p => p.natureza === 'Outro').forEach(p => { const k = (p.natureza_outro || 'não especificada'); out[k] = (out[k] || 0) + 1; });
+    if(Object.keys(out).length) { h('Natureza "Outro" especificada'); Object.entries(out).forEach(([k,n]) => { chk(); d.text('• ' + k + ': ' + n, 16, y); y += 5.5; }); }
+    const cat = {}, eqs = {};
+    correctivePanes.forEach(p => { const e = equipments.find(x => x.code === p.eqCode); const c = e ? e.category : 'Sem cadastro'; cat[c] = (cat[c] || 0) + 1; eqs[p.eqCode] = (eqs[p.eqCode] || 0) + 1; });
+    h('Panes por categoria de EAS');
+    Object.entries(cat).sort((a,b) => b[1]-a[1]).forEach(([k,n]) => { chk(); d.text('• ' + k + ': ' + n + ' (' + (s.total ? (n/s.total*100).toFixed(1) : 0) + '%)', 16, y); y += 5.5; });
+    h('Equipamentos com mais panes');
+    Object.entries(eqs).sort((a,b) => b[1]-a[1]).slice(0,8).forEach(([k,n]) => { const e = equipments.find(x => x.code === k); chk(); d.text('• ' + k + (e ? ' — ' + e.name : '') + ': ' + n, 16, y); y += 5.5; });
+    d.save('Relatorio_Panes_por_Natureza_' + new Date().toISOString().slice(0,10) + '.pdf');
+  }
+  async function syncSavePane(rec) {
+    const c = (typeof supabaseClient !== 'undefined') ? supabaseClient : null; if(!c) return;
+    try { const { error } = await c.from('eas_panes_historico').upsert(rec);
+      if(error) showToast('Pane salva só neste aparelho: ' + error.message);
+    } catch(e) { showToast('Falha ao sincronizar a pane.'); }
+  }
+
   function refreshAll() {
+    fillCategoryList();
     updateKPIs();
     renderDashboardAlerts();
     renderInventory();
@@ -987,13 +1069,13 @@
     const editId = document.getElementById('eqEditId').value;
     const code = document.getElementById('eqCode').value.trim();
     const name = document.getElementById('eqName').value.trim();
-    const category = document.getElementById('eqCategory').value;
+    const category = document.getElementById('eqCategory').value.trim();
     const base = document.getElementById('eqBase').value.trim();
     const proxima_preventiva = document.getElementById('eqProximaPreventiva').value;
     const status = document.getElementById('eqStatus').value;
     const notes = document.getElementById('eqNotes').value.trim();
 
-    if(!code || !name || !base) {
+    if(!code || !name || !base || !category) {
       showToast('Preencha os campos obrigatórios (Código, Nome, Base).');
       return;
     }
@@ -1105,17 +1187,28 @@
     const status = document.getElementById('corrStatus').value;
     const tech = document.getElementById('corrTech').value.trim();
     const desc = document.getElementById('corrDesc').value.trim();
+    const natureza = document.getElementById('corrNature').value;
+    const natureza_outro = document.getElementById('corrNatureOther').value.trim();
 
     if(!desc) {
       showToast('Descreva a pane ocorrida.');
       return;
     }
+    if(natureza === 'Outro' && !natureza_outro) {
+      showToast('Informe qual é a natureza da pane.');
+      return;
+    }
 
     const newCorr = {
       id: Date.now().toString(),
-      eqCode, date, status, tech, desc
+      eqCode, date, status, tech, desc,
+      natureza, natureza_outro: natureza === 'Outro' ? natureza_outro : ''
     };
     correctivePanes.unshift(newCorr);
+    syncSavePane(newCorr);
+    document.getElementById('corrNature').value = 'Elétrica';
+    document.getElementById('corrNatureOther').value = '';
+    toggleNatureOther();
 
     // Atualizar status do EAS
     const eq = equipments.find(x => x.code === eqCode);
@@ -1280,6 +1373,7 @@
 
   // GRÁFICOS (CHART.JS)
   function renderCharts() {
+    renderNatureChart();
     // 1. Categoria
     const categories = ['GPU (Gerador de Partida)', 'ACU (Ar Condicionado)', 'Macaco Hidráulico', 'Trator de Reboque', 'Escada de Embarque'];
     const catCounts = categories.map(cat => equipments.filter(e => e.category === cat).length);
