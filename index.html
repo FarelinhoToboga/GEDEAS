@@ -749,8 +749,22 @@
   let supabaseUrl = localStorage.getItem('sga_supabase_url') || '';
   let supabaseKey = localStorage.getItem('sga_supabase_key') || '';
   let supabaseClient = null;
+  const SUPABASE_URL = 'https://csmbnqbromklhuudgfrk.supabase.co';
+  const SUPABASE_KEY = 'sb_publishable_7L4YVoDBLE7qoSPLRl17nw_-ki8J_b3';
+  let role = 'admin'; // modo demonstração local: sem restrições
+  const can = a => role === 'admin' || (a === 'reg' && role === 'operador');
+  function deny() { showToast('Seu perfil não permite esta ação.'); return false; }
+  function startSupabaseClient() {
+    supabaseUrl = SUPABASE_URL; supabaseKey = SUPABASE_KEY;
+    if(!supabaseClient) supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  }
+  async function loadRole(user) {
+    const r = await supabaseClient.from('perfis').select('papel').eq('user_id', user.id).maybeSingle();
+    role = (r.data && r.data.papel) || '';
+    return !!role;
+  }
 
-  let currentUser = JSON.parse(localStorage.getItem('sga_current_user')) || null;
+  let currentUser = authMode === 'local' ? (JSON.parse(localStorage.getItem('sga_current_user')) || null) : null;
 
   // DADOS DE MEMÓRIA (FALLBACK / MOCK INICIAL)
   let equipments = [
@@ -797,7 +811,7 @@
     const locBtn = document.getElementById('modeLocalBtn');
 
     if(mode === 'supabase') {
-      configForm.style.display = 'block';
+      configForm.style.display = 'none';
       supBtn.className = 'btn sm yellow';
       locBtn.className = 'btn sm outline';
       locBtn.style.color = 'var(--fab-blue)';
@@ -813,52 +827,41 @@
 
   async function handleLogin() {
     const email = document.getElementById('authEmail').value.trim();
-    if(!email) {
-      showToast('Informe sua identificação ou e-mail.');
-      return;
-    }
+    const pass = document.getElementById('authPassword').value;
+    if(!email) { showToast('Informe sua identificação ou e-mail.'); return; }
 
     if(authMode === 'supabase') {
-      supabaseUrl = document.getElementById('supabaseUrlInput').value.trim();
-      supabaseKey = document.getElementById('supabaseKeyInput').value.trim();
-      if(!supabaseUrl || !supabaseKey) {
-        showToast('Insira a Supabase URL e Anon Key válidas.');
+      if(!pass) { showToast('Informe a senha.'); return; }
+      startSupabaseClient();
+      const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password: pass });
+      if(error) { showToast('Falha no login: ' + error.message); return; }
+      if(!(await loadRole(data.user))) {
+        await supabaseClient.auth.signOut();
+        showToast('Usuário sem perfil de acesso. Procure o administrador.');
         return;
       }
-      localStorage.setItem('sga_supabase_url', supabaseUrl);
-      localStorage.setItem('sga_supabase_key', supabaseKey);
-
-      try {
-        supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey);
-        // Testar conexão buscando equipamentos
-        const { data, error } = await supabaseClient.from('eas_equipamentos').select('*').limit(1);
-        if(error && error.code !== 'PGRST116') {
-          console.warn('Erro Supabase, fallback local:', error.message);
-        }
-      } catch(err) {
-        console.error('Falha ao instanciar Supabase:', err);
-      }
+      currentUser = { email, name: email.split('@')[0].toUpperCase() };
+    } else {
+      role = 'admin';
+      currentUser = { email, name: email.split('@')[0].toUpperCase() };
+      localStorage.setItem('sga_current_user', JSON.stringify(currentUser));
     }
-
     localStorage.setItem('sga_auth_mode', authMode);
-    currentUser = { email, name: email.split('@')[0].toUpperCase() };
-    localStorage.setItem('sga_current_user', JSON.stringify(currentUser));
-
+    document.getElementById('authPassword').value = '';
     initAppSession();
     showToast('Sessão iniciada com sucesso.');
   }
 
   function handleLogout() {
     localStorage.removeItem('sga_current_user');
-    currentUser = null;
-    document.body.classList.remove('logged-in');
-    document.getElementById('authScreen').style.display = 'flex';
+    const done = () => location.reload();
+    if(supabaseClient) supabaseClient.auth.signOut().then(done, done); else done();
   }
 
   async function initAppSession() {
     document.body.classList.add('logged-in');
     document.getElementById('authScreen').style.display = 'none';
-    document.getElementById('userNameDisplay').innerHTML = `<b>${currentUser.name}</b>`;
+    document.getElementById('userNameDisplay').innerHTML = `<b>${currentUser.name}</b> · ${role}`;
     document.getElementById('userAvatarText').innerText = currentUser.name.substring(0, 2);
 
     const syncBadge = document.getElementById('syncStatusBadge');
@@ -884,33 +887,31 @@
   // SINCRONIZAÇÃO SUPABASE (TABELAS: eas_equipamentos, eas_manutencoes, eas_panes_historico)
   async function fetchSupabaseData() {
     if(!supabaseClient) return;
-    try {
-      const resEq = await supabaseClient.from('eas_equipamentos').select('*');
-      if(resEq.data && resEq.data.length > 0) equipments = resEq.data;
-
-      const resPrev = await supabaseClient.from('eas_manutencoes').select('*');
-      if(resPrev.data && resPrev.data.length > 0) preventivas = resPrev.data;
-
-      const resCorr = await supabaseClient.from('eas_panes_historico').select('*');
-      if(resCorr.data && resCorr.data.length > 0) correctivePanes = resCorr.data;
-    } catch(err) {
-      console.error('Erro ao buscar dados do Supabase:', err);
-    }
+    equipments = []; preventivas = []; correctivePanes = [];
+    const rs = await Promise.all([
+      supabaseClient.from('eas_equipamentos').select('*'),
+      supabaseClient.from('eas_manutencoes').select('*'),
+      supabaseClient.from('eas_panes_historico').select('*')
+    ]);
+    rs.forEach(r => { if(r.error) showToast('Erro ao carregar dados: ' + r.error.message); });
+    equipments = rs[0].data || []; preventivas = rs[1].data || []; correctivePanes = rs[2].data || [];
   }
-
-  async function syncSaveEquipmentToSupabase(eq) {
+  async function syncUpsert(table, rec) {
     if(authMode !== 'supabase' || !supabaseClient) return;
-    try {
-      await supabaseClient.from('eas_equipamentos').upsert([eq]);
-    } catch(err) { console.error('Erro sync eq:', err); }
+    try { const { error } = await supabaseClient.from(table).upsert([rec]);
+      if(error) showToast('Não foi possível gravar no servidor: ' + error.message);
+    } catch(e) { showToast('Falha ao sincronizar com o servidor.'); }
+  }
+  async function syncRemove(table, id) {
+    if(authMode !== 'supabase' || !supabaseClient) return;
+    try { const { error } = await supabaseClient.from(table).delete().eq('id', id);
+      if(error) showToast('Não foi possível excluir no servidor: ' + error.message);
+    } catch(e) { showToast('Falha ao sincronizar com o servidor.'); }
   }
 
-  async function syncDeleteEquipmentFromSupabase(id) {
-    if(authMode !== 'supabase' || !supabaseClient) return;
-    try {
-      await supabaseClient.from('eas_equipamentos').delete().eq('id', id);
-    } catch(err) { console.error('Erro delete eq:', err); }
-  }
+  async function syncSaveEquipmentToSupabase(eq) { return syncUpsert('eas_equipamentos', eq); }
+
+  async function syncDeleteEquipmentFromSupabase(id) { return syncRemove('eas_equipamentos', id); }
 
   // NAVEGAÇÃO
   function switchView(viewId, el) {
@@ -1015,12 +1016,7 @@
     Object.entries(eqs).sort((a,b) => b[1]-a[1]).slice(0,8).forEach(([k,n]) => { const e = equipments.find(x => x.code === k); chk(); d.text('• ' + k + (e ? ' — ' + e.name : '') + ': ' + n, 16, y); y += 5.5; });
     d.save('Relatorio_Panes_por_Natureza_' + new Date().toISOString().slice(0,10) + '.pdf');
   }
-  async function syncSavePane(rec) {
-    const c = (typeof supabaseClient !== 'undefined') ? supabaseClient : null; if(!c) return;
-    try { const { error } = await c.from('eas_panes_historico').upsert(rec);
-      if(error) showToast('Pane salva só neste aparelho: ' + error.message);
-    } catch(e) { showToast('Falha ao sincronizar a pane.'); }
-  }
+  async function syncSavePane(rec) { return syncUpsert('eas_panes_historico', rec); }
 
   function refreshAll() {
     fillCategoryList();
@@ -1065,7 +1061,7 @@
   }
 
   // CRUD EQUIPAMENTOS
-  function saveEquipment() {
+  function saveEquipment() { if(!can('edit')) return deny();
     const editId = document.getElementById('eqEditId').value;
     const code = document.getElementById('eqCode').value.trim();
     const name = document.getElementById('eqName').value.trim();
@@ -1121,7 +1117,7 @@
     openModal('modalEquipment');
   }
 
-  function deleteEquipment(id) {
+  function deleteEquipment(id) { if(!can('edit')) return deny();
     const eq = equipments.find(x => x.id === id);
     if(eq) syncDeleteEquipmentFromSupabase(eq.id);
     equipments = equipments.filter(x => x.id !== id);
@@ -1130,7 +1126,7 @@
   }
 
   // PREVENTIVAS
-  function savePreventive() {
+  function savePreventive() { if(!can('reg')) return deny();
     const eqCode = document.getElementById('prevEqCode').value;
     const date = document.getElementById('prevDate').value;
     const tech = document.getElementById('prevTech').value.trim();
@@ -1150,7 +1146,7 @@
       id: Date.now().toString(),
       eqCode, date, tech, desc, status
     };
-    preventivas.unshift(newPrev);
+    preventivas.unshift(newPrev); syncUpsert('eas_manutencoes', newPrev);
 
     // Atualizar data no EAS correspondente
     const eq = equipments.find(x => x.code === eqCode);
@@ -1165,10 +1161,10 @@
     refreshAll();
   }
 
-  function completePreventive(id) {
+  function completePreventive(id) { if(!can('reg')) return deny();
     const p = preventivas.find(x => x.id === id);
     if(p) {
-      p.status = 'Concluído';
+      p.status = 'Concluído'; syncUpsert('eas_manutencoes', p);
       // Retornar EAS para operacional
       const eq = equipments.find(x => x.code === p.eqCode);
       if(eq) {
@@ -1181,7 +1177,7 @@
   }
 
   // PANES / CORRETIVAS
-  function saveCorrective() {
+  function saveCorrective() { if(!can('reg')) return deny();
     const eqCode = document.getElementById('corrEqCode').value;
     const date = document.getElementById('corrDate').value;
     const status = document.getElementById('corrStatus').value;
@@ -1226,10 +1222,10 @@
     refreshAll();
   }
 
-  function resolveCorrective(id) {
+  function resolveCorrective(id) { if(!can('reg')) return deny();
     const c = correctivePanes.find(x => x.id === id);
     if(c) {
-      c.status = 'Solucionada';
+      c.status = 'Solucionada'; syncUpsert('eas_panes_historico', c);
       const eq = equipments.find(x => x.code === c.eqCode);
       if(eq) {
         eq.status = 'Operacional';
@@ -1440,6 +1436,18 @@
     document.body.removeChild(link);
     showToast('Relatório CSV exportado.');
   }
+  (async function restoreSession() {
+    if(authMode !== 'supabase') return;
+    try {
+      startSupabaseClient();
+      const { data } = await supabaseClient.auth.getSession();
+      if(data.session && await loadRole(data.session.user)) {
+        const email = data.session.user.email;
+        currentUser = { email, name: email.split('@')[0].toUpperCase() };
+        initAppSession();
+      }
+    } catch(e) { console.warn('Sessão não restaurada:', e); }
+  })();
 </script>
 </body>
 </html>
