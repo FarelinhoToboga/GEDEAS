@@ -255,6 +255,8 @@
     .kpi-grid { grid-template-columns: 1fr 1fr; }
     .form-grid { grid-template-columns: 1fr; }
   }
+.badge.transferido{background:#e5e7eb;color:#374151;}
+  #modeLocalBtn,#modeSupabaseBtn{display:none !important;}
 </style>
 </head>
 <body>
@@ -290,7 +292,7 @@
 
       <div class="form-group">
         <label>E-mail ou Identificação Militar / Graduação</label>
-        <input type="text" id="authEmail" placeholder="Ex: Cap Aviador Silva / sga@fab.mil.br">
+        <input type="text" id="authEmail" placeholder="seu.email@exemplo.com">
       </div>
       <div class="form-group" style="margin-bottom:20px;">
         <label>Senha de Acesso</label>
@@ -484,6 +486,7 @@
           <option value="Preventiva">Manutenção Preventiva</option>
           <option value="Corretiva">Manutenção Corretiva</option>
           <option value="Inoperante">Inoperante</option>
+          <option value="Transferido para outra OM">Transferido para outra OM</option>
         </select>
         <select id="filterCategory" onchange="renderInventory()">
           <option value="">Todas as Categorias</option>
@@ -633,6 +636,7 @@
             <option value="Preventiva">Manutenção Preventiva</option>
             <option value="Corretiva">Manutenção Corretiva</option>
             <option value="Inoperante">Inoperante</option>
+          <option value="Transferido para outra OM">Transferido para outra OM</option>
           </select>
         </div>
         <div class="form-group full">
@@ -745,7 +749,7 @@
 
 <script>
   // CONFIGURAÇÃO SUPABASE E ESTADO GLOBAL
-  let authMode = localStorage.getItem('sga_auth_mode') || 'local'; // 'supabase' ou 'local'
+  let authMode = 'supabase'; // 'supabase' ou 'local'
   let supabaseUrl = localStorage.getItem('sga_supabase_url') || '';
   let supabaseKey = localStorage.getItem('sga_supabase_key') || '';
   let supabaseClient = null;
@@ -931,9 +935,9 @@
   }
 
   // MODAIS
-  function openModal(modalId) {
+  function openModal(modalId, keepData) {
     document.getElementById(modalId).classList.add('open');
-    if(modalId === 'modalEquipment') {
+    if(modalId === 'modalEquipment' && !keepData) {
       document.getElementById('eqEditId').value = '';
       document.getElementById('modalEqTitle').innerText = 'Cadastrar Novo EAS';
       document.getElementById('eqCode').value = '';
@@ -1044,7 +1048,7 @@
 
   // KPIS
   function updateKPIs() {
-    const total = equipments.length;
+    const total = equipments.filter(e => e.status !== 'Transferido para outra OM').length;
     const operacional = equipments.filter(e => e.status === 'Operacional').length;
     const opPct = total > 0 ? Math.round((operacional / total) * 100) : 0;
 
@@ -1114,7 +1118,7 @@
     document.getElementById('eqProximaPreventiva').value = eq.proxima_preventiva || '';
     document.getElementById('eqStatus').value = eq.status;
     document.getElementById('eqNotes').value = eq.notes;
-    openModal('modalEquipment');
+    openModal('modalEquipment', true);
   }
 
   function deleteEquipment(id) { if(!can('edit')) return deny();
@@ -1296,7 +1300,7 @@
 
     let html = '';
     filtered.forEach(e => {
-      const badgeClass = e.status.toLowerCase().includes('preventiva') ? 'preventiva' : (e.status.toLowerCase().includes('operacional') ? 'operacional' : (e.status.toLowerCase().includes('inoperante') ? 'inoperante' : 'corretiva'));
+      const badgeClass = e.status === 'Transferido para outra OM' ? 'transferido' : e.status.toLowerCase().includes('preventiva') ? 'preventiva' : (e.status.toLowerCase().includes('operacional') ? 'operacional' : (e.status.toLowerCase().includes('inoperante') ? 'inoperante' : 'corretiva'));
       html += `
         <tr>
           <td style="font-family:'Roboto Mono',monospace; font-weight:600; color:var(--fab-blue);">${e.code}</td>
@@ -1371,8 +1375,9 @@
   function renderCharts() {
     renderNatureChart();
     // 1. Categoria
-    const categories = ['GPU (Gerador de Partida)', 'ACU (Ar Condicionado)', 'Macaco Hidráulico', 'Trator de Reboque', 'Escada de Embarque'];
-    const catCounts = categories.map(cat => equipments.filter(e => e.category === cat).length);
+    const fleet = equipments.filter(e => e.status !== 'Transferido para outra OM');
+    const categories = [...new Set(fleet.map(e => e.category).filter(Boolean))].sort();
+    const catCounts = categories.map(cat => fleet.filter(e => e.category === cat).length);
 
     const ctxCat = document.getElementById('chartCategory').getContext('2d');
     if(chartCategoryInstance) chartCategoryInstance.destroy();
@@ -1380,7 +1385,7 @@
     chartCategoryInstance = new Chart(ctxCat, {
       type: 'bar',
       data: {
-        labels: ['GPU', 'ACU', 'Macacos', 'Tratores', 'Escadas'],
+        labels: categories.map(c => c.replace(/\s*\(.*\)/, '')),
         datasets: [{
           label: 'Qtd',
           data: catCounts,
@@ -1400,6 +1405,7 @@
     const opCount = equipments.filter(e => e.status === 'Operacional').length;
     const prevCount = equipments.filter(e => e.status === 'Preventiva').length;
     const corrCount = equipments.filter(e => e.status === 'Corretiva' || e.status === 'Inoperante').length;
+    const trCount = equipments.filter(e => e.status === 'Transferido para outra OM').length;
 
     const ctxStatus = document.getElementById('chartStatus').getContext('2d');
     if(chartStatusInstance) chartStatusInstance.destroy();
@@ -1407,10 +1413,10 @@
     chartStatusInstance = new Chart(ctxStatus, {
       type: 'doughnut',
       data: {
-        labels: ['Operacional', 'Em Preventiva', 'Corretiva / Inoperante'],
+        labels: ['Operacional', 'Em Preventiva', 'Corretiva / Inoperante', 'Transferido para outra OM'],
         datasets: [{
-          data: [opCount, prevCount, corrCount],
-          backgroundColor: ['#00A651', '#FFCC00', '#C8102E']
+          data: [opCount, prevCount, corrCount, trCount],
+          backgroundColor: ['#00A651', '#FFCC00', '#C8102E', '#9CA3AF']
         }]
       },
       options: {
