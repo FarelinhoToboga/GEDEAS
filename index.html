@@ -255,7 +255,20 @@
     .kpi-grid { grid-template-columns: 1fr 1fr; }
     .form-grid { grid-template-columns: 1fr; }
   }
-.badge.transferido{background:#e5e7eb;color:#374151;}
+.sortable{cursor:pointer;user-select:none;white-space:nowrap;}
+  .si{font-size:10px;color:var(--fab-blue);}
+  .filter-head th{padding:4px 6px;background:var(--gray-50);}
+  .filter-head input,.filter-head select{width:100%;min-width:90px;font-size:12px;padding:4px 6px;}
+  .tag-chip{display:inline-block;font-size:11px;padding:2px 8px;border-radius:999px;background:#e0e7ff;color:#3730a3;margin:1px 3px 1px 0;white-space:nowrap;}
+  .tag-chip.tr{background:#e5e7eb;color:#374151;}
+  .eq-thumb{width:36px;height:36px;object-fit:cover;border-radius:6px;background:var(--gray-100);flex:none;}
+  .sheet-photo{width:180px;height:140px;object-fit:cover;border-radius:8px;background:var(--gray-100);}
+  .sheet-top{display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start;}
+  .sheet-kv{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px 16px;font-size:13px;flex:1;min-width:240px;}
+  .sheet-kv span{display:block;font-size:11px;color:var(--gray-500);text-transform:uppercase;}
+  .sheet-table{width:100%;border-collapse:collapse;font-size:12px;margin:6px 0 16px;}
+  .sheet-table th,.sheet-table td{border-bottom:1px solid var(--gray-200,#e5e7eb);padding:6px;text-align:left;vertical-align:top;}
+  .badge.transferido{background:#e5e7eb;color:#374151;}
   #modeLocalBtn,#modeSupabaseBtn{display:none !important;}
 </style>
 </head>
@@ -333,6 +346,10 @@
   <a class="sn-item" onclick="switchView('inventory', this)">
     <svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/></svg>
     <span class="lb">Inventário de EAS</span>
+  </a>
+        <a class="sn-item" onclick="switchView('transferred', this)">
+    <svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/></svg>
+    <span class="lb">Equipamentos Transferidos</span>
   </a>
   <a class="sn-item" onclick="switchView('preventive', this)">
     <svg viewBox="0 0 24 24"><path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11z"/></svg>
@@ -449,7 +466,7 @@
           <thead>
             <tr>
               <th>Alerta / Prioridade</th>
-              <th>Código / EAS</th>
+              
               <th>Equipamento</th>
               <th>Base / OM</th>
               <th>Data Limite / Ocorrência</th>
@@ -479,37 +496,31 @@
 
     <div class="card">
       <div class="filter-row">
-        <input type="text" id="filterSearch" placeholder="Buscar por código, nome ou base..." oninput="renderInventory()">
-        <select id="filterStatus" onchange="renderInventory()">
-          <option value="">Todos os Status</option>
-          <option value="Operacional">Operacional</option>
-          <option value="Preventiva">Manutenção Preventiva</option>
-          <option value="Corretiva">Manutenção Corretiva</option>
-          <option value="Inoperante">Inoperante</option>
-          <option value="Transferido para outra OM">Transferido para outra OM</option>
-        </select>
-        <select id="filterCategory" onchange="renderInventory()">
-          <option value="">Todas as Categorias</option>
-          <option value="GPU (Gerador de Partida)">GPU (Gerador de Partida)</option>
-          <option value="ACU (Ar Condicionado)">ACU (Ar Condicionado)</option>
-          <option value="Macaco Hidráulico">Macaco Hidráulico</option>
-          <option value="Trator de Reboque">Trator de Reboque</option>
-          <option value="Escada de Embarque">Escada de Embarque</option>
-        </select>
+        <input type="text" id="filterSearch" placeholder="Buscar por nome, categoria, base ou etiqueta..." oninput="renderInventory()">
+        <button type="button" class="btn sm outline" onclick="clearInvFilters()">Limpar filtros</button>
       </div>
 
       <div class="table-wrap">
         <table>
           <thead>
             <tr>
-              <th>Código</th>
-              <th>Equipamento</th>
-              <th>Categoria</th>
-              <th>Base / OM</th>
-              <th>Próxima Preventiva</th>
-              <th>Status</th>
+              <th class="sortable" onclick="sortInventory('name')">Equipamento<span class="si" data-sk="name"></span></th>
+              <th class="sortable" onclick="sortInventory('category')">Categoria<span class="si" data-sk="category"></span></th>
+              <th class="sortable" onclick="sortInventory('base')">Base / OM<span class="si" data-sk="base"></span></th>
+              <th class="sortable" onclick="sortInventory('proxima_preventiva')">Próxima Preventiva<span class="si" data-sk="proxima_preventiva"></span></th>
+              <th class="sortable" onclick="sortInventory('status')">Status<span class="si" data-sk="status"></span></th>
+              <th>Etiquetas</th>
               <th>Observações Técnicas</th>
               <th style="text-align: right;">Ações</th>
+            </tr>
+            <tr class="filter-head">
+              <th><input type="text" id="fName" placeholder="Filtrar..." oninput="renderInventory()"></th>
+              <th><select id="fCategory" onchange="renderInventory()"></select></th>
+              <th><select id="fBase" onchange="renderInventory()"></select></th>
+              <th><select id="fPrev" onchange="renderInventory()"><option value="">Todas</option><option value="vencida">Vencidas</option><option value="30">Próximos 30 dias</option><option value="sem">Sem data</option></select></th>
+              <th><select id="fStatus" onchange="renderInventory()"></select></th>
+              <th><select id="fTag" onchange="renderInventory()"></select></th>
+              <th></th><th></th>
             </tr>
           </thead>
           <tbody id="inventoryTableBody">
@@ -521,7 +532,14 @@
   </section>
 
   <!-- PREVENTIVE MAINTENANCE VIEW (CALENDAR) -->
-  <section id="view-preventive" class="view-pane">
+  <section id="view-transferred" class="view-pane">
+  <div style="margin-bottom:12px;"><h2 style="font-family:'Roboto Condensed',sans-serif;margin:0 0 4px;">Equipamentos Transferidos</h2>
+  <p style="color:var(--gray-500);font-size:13px;margin:0;">Equipamentos enviados a outra OM ficam arquivados aqui, fora dos indicadores do inventário. Se o equipamento voltar (por exemplo, após manutenção), use "Retornar ao Inventário".</p></div>
+  <div class="card"><div style="overflow-x:auto;"><table>
+    <thead><tr><th>Equipamento</th><th>Categoria</th><th>Base / OM</th><th>Etiquetas</th><th>Transferido em</th><th>Observações</th><th style="text-align:right;">Ações</th></tr></thead>
+    <tbody id="transferredTableBody"></tbody></table></div></div>
+</section>
+<section id="view-preventive" class="view-pane">
     <div class="header-banner">
       <div class="hb-title">
         <h1>Plano de Manutenção Preventiva (Calendário)</h1>
@@ -542,7 +560,7 @@
           <thead>
             <tr>
               <th>Data Agendada</th>
-              <th>EAS / Código</th>
+              
               <th>Equipamento</th>
               <th>Base</th>
               <th>Técnico / Responsável</th>
@@ -581,7 +599,7 @@
           <thead>
             <tr>
               <th>Data da Pane</th>
-              <th>EAS / Código</th>
+              
               <th>Descrição do Problema / Pane</th>
               <th>Técnico Responsável</th>
               <th>Status do Reparo</th>
@@ -608,7 +626,7 @@
     <div class="modal-body">
       <input type="hidden" id="eqEditId">
       <div class="form-grid">
-        <div class="form-group">
+        <div class="form-group" style="display:none">
           <label>Código / Patrimônio</label>
           <input type="text" id="eqCode" placeholder="Ex: GPU-01, TR-12">
         </div>
@@ -640,6 +658,21 @@
           </select>
         </div>
         <div class="form-group full">
+          <label>Etiquetas (até 2)</label>
+          <div style="display:flex;gap:10px;">
+            <input type="text" id="eqTag1" list="eqTagList" placeholder="Etiqueta 1" style="flex:1;">
+            <input type="text" id="eqTag2" list="eqTagList" placeholder="Etiqueta 2" style="flex:1;">
+            <datalist id="eqTagList"></datalist>
+          </div>
+        </div>
+        <div class="form-group full">
+          <label>Foto do Equipamento (opcional)</label>
+          <div style="display:flex;gap:10px;align-items:center;">
+            <img id="eqPhotoPreview" class="eq-thumb" style="display:none;width:64px;height:64px;" alt="">
+            <input type="file" id="eqPhoto" accept="image/*" onchange="previewLocal(this,'eqPhotoPreview')">
+          </div>
+        </div>
+        <div class="form-group full">
           <label>Observações Técnicas / Restrições</label>
           <textarea id="eqNotes" rows="2" placeholder="Informações adicionais sobre o estado do equipamento..."></textarea>
         </div>
@@ -649,6 +682,32 @@
       <button class="btn outline" style="color:var(--gray-700); border-color:var(--gray-300)" onclick="closeModal('modalEquipment')">Cancelar</button>
       <button class="btn yellow" onclick="saveEquipment()">Salvar Equipamento</button>
     </div>
+  </div>
+</div>
+
+<!-- MODAL: RETORNAR AO INVENTÁRIO -->
+<div class="modal-backdrop" id="modalReturn">
+  <div class="modal" style="max-width:460px;">
+    <div class="modal-head"><h3 id="returnTitle">Retornar ao Inventário</h3><button class="modal-close" onclick="closeModal('modalReturn')">&times;</button></div>
+    <div class="modal-body">
+      <div class="form-group"><label>Status ao retornar</label>
+        <select id="returnStatus"><option value="Operacional">Operacional</option><option value="Preventiva">Preventiva</option><option value="Corretiva">Corretiva</option><option value="Inoperante">Inoperante</option></select></div>
+      <div class="form-group" style="margin-top:10px;"><label>Observação (opcional)</label>
+        <textarea id="returnNote" rows="2" placeholder="Ex.: retornou da manutenção na OM de origem"></textarea></div>
+    </div>
+    <div class="modal-foot"><button class="btn outline" onclick="closeModal('modalReturn')">Cancelar</button><button class="btn yellow" onclick="confirmReturn()">Retornar ao Inventário</button></div>
+  </div>
+</div>
+
+<!-- MODAL: FICHA DO EAS -->
+<div class="modal-backdrop" id="modalSheet">
+  <div class="modal" style="max-width:880px;">
+    <div class="modal-head">
+      <h3 id="sheetTitle">Ficha do EAS</h3>
+      <button class="modal-close" onclick="closeModal('modalSheet')">&times;</button>
+    </div>
+    <div class="modal-body" id="sheetBody"></div>
+    <div class="modal-foot" id="sheetFoot"></div>
   </div>
 </div>
 
@@ -730,6 +789,10 @@
         <div class="form-group" id="corrNatureOtherWrap" style="display:none">
           <label>Qual a natureza? (Outro)</label>
           <input type="text" id="corrNatureOther" placeholder="Ex: Estrutural, combustível...">
+        </div>
+        <div class="form-group full">
+          <label>Foto da Pane (opcional)</label>
+          <input type="file" id="corrPhoto" accept="image/*">
         </div>
         <div class="form-group full">
           <label>Descrição Detalhada da Pane / Diagnóstico</label>
@@ -928,6 +991,7 @@
     const viewNames = {
       dashboard: 'Dashboard de Disponibilidade',
       inventory: 'Inventário de EAS',
+      transferred: 'Equipamentos Transferidos',
       preventive: 'Plano Preventivo por Calendário',
       corrective: 'Histórico de Panes e Corretivas'
     };
@@ -938,6 +1002,9 @@
   function openModal(modalId, keepData) {
     document.getElementById(modalId).classList.add('open');
     if(modalId === 'modalEquipment' && !keepData) {
+      document.getElementById('eqTag1').value = ''; document.getElementById('eqTag2').value = '';
+      document.getElementById('eqPhoto').value = '';
+      const pv0 = document.getElementById('eqPhotoPreview'); pv0.style.display = 'none'; pv0.removeAttribute('src'); pv0.dataset.foto = '';
       document.getElementById('eqEditId').value = '';
       document.getElementById('modalEqTitle').innerText = 'Cadastrar Novo EAS';
       document.getElementById('eqCode').value = '';
@@ -1022,7 +1089,208 @@
   }
   async function syncSavePane(rec) { return syncUpsert('eas_panes_historico', rec); }
 
+
+  // ===== FOTOS E FICHA DO EAS =====
+  const FOTO_BUCKET = 'eas-fotos';
+  const fotoCache = {};
+  const hx = v => String(v == null ? '' : v).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  async function fotoUrl(path) {
+    if(!path || !supabaseClient) return '';
+    const c = fotoCache[path]; if(c && c.exp > Date.now()) return c.url;
+    const { data, error } = await supabaseClient.storage.from(FOTO_BUCKET).createSignedUrl(path, 3600);
+    if(error || !data) return '';
+    fotoCache[path] = { url: data.signedUrl, exp: Date.now() + 3300000 };
+    return data.signedUrl;
+  }
+  async function hydratePhotos(root) {
+    const imgs = [...root.querySelectorAll('img[data-foto]')].filter(i => i.dataset.foto);
+    await Promise.all(imgs.map(async img => {
+      const u = await fotoUrl(img.dataset.foto);
+      if(u) { img.src = u; if(img.parentElement && img.parentElement.tagName === 'A') img.parentElement.href = u; }
+    }));
+  }
+  function previewLocal(inp, imgId) {
+    const img = document.getElementById(imgId), f = inp.files[0];
+    if(f) { img.src = URL.createObjectURL(f); img.dataset.foto = ''; img.style.display = 'block'; } else img.style.display = 'none';
+  }
+  function compressImage(file, max = 1280, q = 0.8) {
+    return new Promise((res, rej) => {
+      const img = new Image(), url = URL.createObjectURL(file);
+      img.onload = () => {
+        const r = Math.min(1, max / Math.max(img.width, img.height));
+        const c = document.createElement('canvas'); c.width = Math.round(img.width * r); c.height = Math.round(img.height * r);
+        c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(url);
+        c.toBlob(b => b ? res(b) : rej(new Error('Falha ao processar a imagem.')), 'image/jpeg', q);
+      };
+      img.onerror = () => rej(new Error('Arquivo de imagem inválido.'));
+      img.src = url;
+    });
+  }
+  async function uploadFoto(file, pasta) {
+    if(!file || authMode !== 'supabase' || !supabaseClient) return null;
+    try {
+      const blob = await compressImage(file);
+      const path = pasta + '/' + Date.now() + '-' + Math.random().toString(36).slice(2, 8) + '.jpg';
+      const { error } = await supabaseClient.storage.from(FOTO_BUCKET).upload(path, blob, { contentType: 'image/jpeg' });
+      if(error) { showToast('Falha ao enviar a foto: ' + error.message); return null; }
+      return path;
+    } catch(e) { showToast(e.message || 'Falha ao enviar a foto.'); return null; }
+  }
+  function statusBadgeClass(st) {
+    return ({ 'Operacional':'operacional', 'Preventiva':'preventiva', 'Corretiva':'corretiva', 'Inoperante':'inoperante', 'Transferido para outra OM':'transferido' })[st] || '';
+  }
+  function openEquipSheet(id) {
+    const e = equipments.find(x => x.id === id); if(!e) return;
+    const byDate = (a, b) => String(b.date || '').localeCompare(String(a.date || ''));
+    const panes = correctivePanes.filter(p => p.eqCode === e.code).sort(byDate);
+    const prevs = preventivas.filter(p => p.eqCode === e.code).sort(byDate);
+    const fmtD = d => d ? String(d).split('-').reverse().join('/') : '-';
+    document.getElementById('sheetTitle').textContent = 'Ficha do EAS: ' + e.name;
+    const natTxt = p => p.natureza ? (p.natureza === 'Outro' ? 'Outro: ' + (p.natureza_outro || '-') : p.natureza) : '-';
+    document.getElementById('sheetBody').innerHTML = `
+      <div class="sheet-top">
+        ${e.foto ? `<a target="_blank" rel="noopener"><img class="sheet-photo" data-foto="${hx(e.foto)}" alt="Foto do equipamento"></a>` : '<div class="sheet-photo" style="display:grid;place-items:center;color:var(--gray-500);font-size:12px;">Sem foto</div>'}
+        <div class="sheet-kv">
+          <div><span>Equipamento</span><b>${hx(e.name)}</b></div>
+          <div><span>Categoria</span>${hx(e.category)}</div>
+          <div><span>Base / OM</span>${hx(e.base)}</div>
+          <div><span>Status</span><span class="badge ${statusBadgeClass(e.status)}" style="text-transform:none;">${hx(e.status)}</span></div>
+          <div><span>Próxima preventiva</span>${hx(fmtD(e.proxima_preventiva))}</div>
+          <div><span>Etiquetas</span>${tagChips(e.tags) || '-'}</div>
+          ${e.transferido_em ? `<div><span>Transferido em</span>${hx(brDate(e.transferido_em))}</div>` : ''}
+          <div><span>Panes registradas</span><b>${panes.length}</b></div>
+          <div style="grid-column:1/-1"><span>Observações</span>${hx(e.notes) || '-'}</div>
+        </div>
+      </div>
+      <h4 style="margin:16px 0 4px;">Histórico de panes (${panes.length})</h4>
+      <table class="sheet-table"><thead><tr><th>Data</th><th>Natureza</th><th>Descrição</th><th>Técnico</th><th>Situação</th><th>Foto</th></tr></thead><tbody>
+      ${panes.map(p => `<tr><td>${hx(fmtD(p.date))}</td><td>${hx(natTxt(p))}</td><td>${hx(p.desc)}</td><td>${hx(p.tech)}</td><td>${hx(p.status)}</td><td>${p.foto ? `<a target="_blank" rel="noopener"><img class="eq-thumb" data-foto="${hx(p.foto)}" alt="Foto da pane"></a>` : '-'}</td></tr>`).join('') || '<tr><td colspan="6" style="color:var(--gray-500);">Nenhuma pane registrada.</td></tr>'}
+      </tbody></table>
+      <h4 style="margin:8px 0 4px;">Manutenções preventivas (${prevs.length})</h4>
+      <table class="sheet-table"><thead><tr><th>Data</th><th>Descrição</th><th>Técnico</th><th>Situação</th></tr></thead><tbody>
+      ${prevs.map(p => `<tr><td>${hx(fmtD(p.date))}</td><td>${hx(p.desc)}</td><td>${hx(p.tech)}</td><td>${hx(p.status)}</td></tr>`).join('') || '<tr><td colspan="4" style="color:var(--gray-500);">Nenhuma preventiva registrada.</td></tr>'}
+      </tbody></table>`;
+    document.getElementById('sheetFoot').innerHTML =
+      (can('edit') ? `<button class="btn outline" style="color:var(--fab-blue);border-color:var(--fab-blue);" onclick="closeModal('modalSheet'); editEquipment('${hx(e.id)}')">Editar cadastro</button>` : '') +
+      `<button class="btn yellow" onclick="closeModal('modalSheet')">Fechar</button>`;
+    openModal('modalSheet', true);
+    hydratePhotos(document.getElementById('sheetBody'));
+  }
+
+
+  // ===== INVENTÁRIO: ORDENAÇÃO, FILTROS, ETIQUETAS E TRANSFERIDOS =====
+  const TR = 'Transferido para outra OM';
+  const isTransferred = e => e.status === TR || (e.tags || []).includes(TR);
+  const activeEq = () => equipments.filter(e => !isTransferred(e));
+  const todayISO = () => new Date().toLocaleDateString('en-CA');
+  const brDate = d => d ? String(d).split('-').reverse().join('/') : '-';
+  const daysTo = d => d ? Math.round((new Date(d + 'T12:00:00') - new Date(todayISO() + 'T12:00:00')) / 864e5) : null;
+  const STATUS_LABEL = { Preventiva: 'Manutenção Preventiva', Corretiva: 'Manutenção Corretiva' };
+  const TAG_SUGGESTIONS = [TR, 'Corretiva', 'Preventiva', 'Aguardando peça', 'Em inspeção', 'Operacional com restrição', 'Em garantia'];
+  const tagChips = tags => (tags || []).map(t => `<span class="tag-chip${t === TR ? ' tr' : ''}">${hx(t)}</span>`).join('');
+  function applyTransferDate(e) { if(isTransferred(e)) { if(!e.transferido_em) e.transferido_em = todayISO(); } else e.transferido_em = ''; }
+  function fillTagList() {
+    const all = [...new Set([...TAG_SUGGESTIONS, ...equipments.flatMap(e => e.tags || [])])];
+    const dl = document.getElementById('eqTagList'); if(dl) dl.innerHTML = all.map(t => `<option value="${hx(t)}">`).join('');
+  }
+  function fillSel(id, vals, first) {
+    const el = document.getElementById(id); if(!el) return;
+    const cur = el.value;
+    el.innerHTML = `<option value="">${first}</option>` + vals.map(v => `<option value="${hx(v)}">${hx(v)}</option>`).join('');
+    el.value = vals.includes(cur) ? cur : '';
+  }
+  let invSort = { key: 'name', dir: 1 };
+  function sortInventory(k) { invSort = invSort.key === k ? { key: k, dir: -invSort.dir } : { key: k, dir: 1 }; renderInventory(); }
+  function clearInvFilters() {
+    ['filterSearch', 'fName', 'fCategory', 'fBase', 'fPrev', 'fStatus', 'fTag'].forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
+    renderInventory();
+  }
+  function renderInventory() {
+    const tbody = document.getElementById('inventoryTableBody'); if(!tbody) return;
+    const base = activeEq();
+    const uniq = k => [...new Set(base.map(e => e[k]).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'pt-BR'));
+    fillSel('fCategory', uniq('category'), 'Categoria');
+    fillSel('fBase', uniq('base'), 'Base / OM');
+    fillSel('fStatus', ['Operacional', 'Preventiva', 'Corretiva', 'Inoperante'], 'Status');
+    fillSel('fTag', [...new Set(base.flatMap(e => e.tags || []))].sort(), 'Etiqueta');
+    const v = id => document.getElementById(id).value;
+    const q = v('filterSearch').toLowerCase(), fn = v('fName').toLowerCase(), fp = v('fPrev');
+    const rows = base.filter(e => {
+      const hay = [e.name, e.category, e.base, e.status, e.notes, ...(e.tags || [])].join(' ').toLowerCase();
+      if(q && !hay.includes(q)) return false;
+      if(fn && !String(e.name).toLowerCase().includes(fn)) return false;
+      if(v('fCategory') && e.category !== v('fCategory')) return false;
+      if(v('fBase') && e.base !== v('fBase')) return false;
+      if(v('fStatus') && e.status !== v('fStatus')) return false;
+      if(v('fTag') && !(e.tags || []).includes(v('fTag'))) return false;
+      const d = daysTo(e.proxima_preventiva);
+      if(fp === 'vencida' && !(d !== null && d < 0)) return false;
+      if(fp === '30' && !(d !== null && d >= 0 && d <= 30)) return false;
+      if(fp === 'sem' && d !== null) return false;
+      return true;
+    });
+    const k = invSort.key, dir = invSort.dir;
+    rows.sort((a, b) => {
+      if(k === 'proxima_preventiva') { const x = a[k] || '', y = b[k] || ''; if(!x && !y) return 0; if(!x) return 1; if(!y) return -1; return x.localeCompare(y) * dir; }
+      return String(a[k] || '').localeCompare(String(b[k] || ''), 'pt-BR') * dir;
+    });
+    tbody.innerHTML = rows.map(e => {
+      const d = daysTo(e.proxima_preventiva);
+      const dStyle = d === null ? '' : d < 0 ? 'color:#C8102E;font-weight:700;' : d <= 30 ? 'color:#B45309;font-weight:600;' : '';
+      return `<tr style="cursor:pointer;" onclick="openEquipSheet('${hx(e.id)}')" title="Abrir ficha do EAS">
+        <td><div style="display:flex;gap:8px;align-items:center;">${e.foto ? `<img class="eq-thumb" data-foto="${hx(e.foto)}" alt="">` : ''}<b>${hx(e.name)}</b></div></td>
+        <td>${hx(e.category)}</td><td>${hx(e.base)}</td>
+        <td style="${dStyle}">${hx(brDate(e.proxima_preventiva))}${d !== null && d < 0 ? ' (vencida)' : ''}</td>
+        <td><span class="badge ${statusBadgeClass(e.status)}">${hx(STATUS_LABEL[e.status] || e.status)}</span></td>
+        <td>${tagChips(e.tags) || '-'}</td>
+        <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;">${hx(e.notes) || '-'}</td>
+        <td style="text-align: right;" onclick="event.stopPropagation()">${can('edit') ? `<button class="btn sm outline" onclick="transferEquipment('${hx(e.id)}')">Transferir</button> ` : ''}<button class="btn sm outline" style="color:var(--fab-blue); border-color:var(--fab-blue);" onclick="editEquipment('${e.id}')">Editar</button>
+            <button class="btn sm danger" onclick="deleteEquipment('${e.id}')">Excluir</button></td></tr>`;
+    }).join('') || '<tr><td colspan="8" style="text-align:center; padding:30px; color:var(--gray-500);">Nenhum equipamento encontrado com os filtros atuais.</td></tr>';
+    document.querySelectorAll('.si').forEach(sp => { sp.textContent = sp.dataset.sk === invSort.key ? (invSort.dir > 0 ? ' ▲' : ' ▼') : ''; });
+    hydratePhotos(tbody);
+  }
+  function transferEquipment(id) {
+    if(!can('edit')) return deny();
+    const e = equipments.find(x => x.id === id); if(!e) return;
+    if(!confirm('Transferir "' + e.name + '" para outra OM? Ele será movido para a aba Equipamentos Transferidos.')) return;
+    e.tags = [TR, ...(e.tags || []).filter(t => t !== TR)].slice(0, 2);
+    applyTransferDate(e); syncSaveEquipmentToSupabase(e); refreshAll();
+    showToast('Equipamento movido para Equipamentos Transferidos.');
+  }
+  function renderTransferred() {
+    const tb = document.getElementById('transferredTableBody'); if(!tb) return;
+    const rows = equipments.filter(isTransferred).sort((a, b) => String(b.transferido_em || '').localeCompare(String(a.transferido_em || '')));
+    tb.innerHTML = rows.map(e => `<tr style="cursor:pointer;" onclick="openEquipSheet('${hx(e.id)}')">
+      <td><div style="display:flex;gap:8px;align-items:center;">${e.foto ? `<img class="eq-thumb" data-foto="${hx(e.foto)}" alt="">` : ''}<b>${hx(e.name)}</b></div></td>
+      <td>${hx(e.category)}</td><td>${hx(e.base)}</td><td>${tagChips(e.tags) || '-'}</td><td>${hx(brDate(e.transferido_em))}</td>
+      <td style="max-width:240px;">${hx(e.notes) || '-'}</td>
+      <td style="text-align:right;" onclick="event.stopPropagation()">${can('edit') ? `<button class="btn yellow sm" onclick="openReturn('${hx(e.id)}')">Retornar ao Inventário</button>` : ''}</td></tr>`).join('')
+      || '<tr><td colspan="7" style="text-align:center; padding:30px; color:var(--gray-500);">Nenhum equipamento transferido.</td></tr>';
+    hydratePhotos(tb);
+  }
+  let returnId = null;
+  function openReturn(id) {
+    const e = equipments.find(x => x.id === id); if(!e) return;
+    returnId = id; document.getElementById('returnTitle').textContent = 'Retornar ao Inventário: ' + e.name;
+    document.getElementById('returnStatus').value = 'Operacional'; document.getElementById('returnNote').value = '';
+    openModal('modalReturn', true);
+  }
+  function confirmReturn() {
+    if(!can('edit')) return deny();
+    const e = equipments.find(x => x.id === returnId); if(!e) return;
+    e.status = document.getElementById('returnStatus').value;
+    e.tags = (e.tags || []).filter(t => t !== TR);
+    e.transferido_em = '';
+    const n = document.getElementById('returnNote').value.trim();
+    e.notes = (e.notes ? e.notes + '\n' : '') + 'Retornou ao inventário em ' + brDate(todayISO()) + (n ? ': ' + n : '');
+    syncSaveEquipmentToSupabase(e); closeModal('modalReturn'); refreshAll();
+    showToast('Equipamento retornou ao inventário.');
+  }
+
   function refreshAll() {
+    fillTagList();
+    renderTransferred();
     fillCategoryList();
     updateKPIs();
     renderDashboardAlerts();
@@ -1039,8 +1307,8 @@
     const corrSelect = document.getElementById('corrEqCode');
     
     let opts = '';
-    equipments.forEach(e => {
-      opts += `<option value="${e.code}">${e.code} - ${e.name} (${e.base})</option>`;
+    activeEq().forEach(e => {
+      opts += `<option value="${e.code}">${e.name} (${e.base})</option>`;
     });
     if(prevSelect) prevSelect.innerHTML = opts;
     if(corrSelect) corrSelect.innerHTML = opts;
@@ -1048,8 +1316,8 @@
 
   // KPIS
   function updateKPIs() {
-    const total = equipments.filter(e => e.status !== 'Transferido para outra OM').length;
-    const operacional = equipments.filter(e => e.status === 'Operacional').length;
+    const total = activeEq().filter(e => e.status !== 'Transferido para outra OM').length;
+    const operacional = activeEq().filter(e => e.status === 'Operacional').length;
     const opPct = total > 0 ? Math.round((operacional / total) * 100) : 0;
 
     const todayStr = new Date().toISOString().split('T')[0];
@@ -1065,26 +1333,33 @@
   }
 
   // CRUD EQUIPAMENTOS
-  function saveEquipment() { if(!can('edit')) return deny();
+  async function saveEquipment() { if(!can('edit')) return deny();
     const editId = document.getElementById('eqEditId').value;
-    const code = document.getElementById('eqCode').value.trim();
+    let code = document.getElementById('eqCode').value.trim();
     const name = document.getElementById('eqName').value.trim();
     const category = document.getElementById('eqCategory').value.trim();
     const base = document.getElementById('eqBase').value.trim();
     const proxima_preventiva = document.getElementById('eqProximaPreventiva').value;
     const status = document.getElementById('eqStatus').value;
     const notes = document.getElementById('eqNotes').value.trim();
+    const tags = [...new Set(['eqTag1','eqTag2'].map(i => document.getElementById(i).value.trim()).filter(Boolean))].slice(0, 2);
 
-    if(!code || !name || !base || !category) {
-      showToast('Preencha os campos obrigatórios (Código, Nome, Base).');
+    if(!name || !base || !category) {
+      showToast('Preencha os campos obrigatórios (Nome, Categoria e Base).');
       return;
     }
+    if(!code) code = 'EAS-' + Date.now().toString(36).toUpperCase();
+
+    const photoFile = document.getElementById('eqPhoto').files[0];
+    let foto = null;
+    if(photoFile) { showToast('Enviando foto...'); foto = await uploadFoto(photoFile, 'equipamentos'); }
 
     if(editId) {
       const eq = equipments.find(x => x.id === editId);
       if(eq) {
+        if(foto) eq.foto = foto;
         eq.code = code; eq.name = name; eq.category = category; eq.base = base;
-        eq.proxima_preventiva = proxima_preventiva; eq.status = status; eq.notes = notes;
+        eq.proxima_preventiva = proxima_preventiva; eq.status = status; eq.notes = notes; eq.tags = tags; applyTransferDate(eq);
         syncSaveEquipmentToSupabase(eq);
       }
       showToast('Equipamento atualizado.');
@@ -1095,8 +1370,9 @@
       }
       const newEq = {
         id: Date.now().toString(),
-        code, name, category, base, proxima_preventiva, status, notes
+        code, name, category, base, proxima_preventiva, status, notes, foto: foto || '', tags
       };
+      applyTransferDate(newEq);
       equipments.push(newEq);
       syncSaveEquipmentToSupabase(newEq);
       showToast('Novo EAS cadastrado com sucesso.');
@@ -1110,7 +1386,7 @@
     const eq = equipments.find(x => x.id === id);
     if(!eq) return;
     document.getElementById('eqEditId').value = eq.id;
-    document.getElementById('modalEqTitle').innerText = 'Editar EAS: ' + eq.code;
+    document.getElementById('modalEqTitle').innerText = 'Editar EAS: ' + eq.name;
     document.getElementById('eqCode').value = eq.code;
     document.getElementById('eqName').value = eq.name;
     document.getElementById('eqCategory').value = eq.category;
@@ -1118,7 +1394,14 @@
     document.getElementById('eqProximaPreventiva').value = eq.proxima_preventiva || '';
     document.getElementById('eqStatus').value = eq.status;
     document.getElementById('eqNotes').value = eq.notes;
+    const tg = eq.tags || [];
+    document.getElementById('eqTag1').value = tg[0] || ''; document.getElementById('eqTag2').value = tg[1] || '';
+    document.getElementById('eqPhoto').value = '';
+    const pv = document.getElementById('eqPhotoPreview');
+    pv.removeAttribute('src'); pv.dataset.foto = eq.foto || '';
+    pv.style.display = eq.foto ? 'block' : 'none';
     openModal('modalEquipment', true);
+    if(eq.foto) hydratePhotos(document.getElementById('modalEquipment'));
   }
 
   function deleteEquipment(id) { if(!can('edit')) return deny();
@@ -1181,7 +1464,7 @@
   }
 
   // PANES / CORRETIVAS
-  function saveCorrective() { if(!can('reg')) return deny();
+  async function saveCorrective() { if(!can('reg')) return deny();
     const eqCode = document.getElementById('corrEqCode').value;
     const date = document.getElementById('corrDate').value;
     const status = document.getElementById('corrStatus').value;
@@ -1199,14 +1482,19 @@
       return;
     }
 
+    let foto = '';
+    const pf = document.getElementById('corrPhoto').files[0];
+    if(pf) { showToast('Enviando foto...'); foto = (await uploadFoto(pf, 'panes')) || ''; }
+
     const newCorr = {
       id: Date.now().toString(),
       eqCode, date, status, tech, desc,
-      natureza, natureza_outro: natureza === 'Outro' ? natureza_outro : ''
+      natureza, natureza_outro: natureza === 'Outro' ? natureza_outro : '', foto
     };
     correctivePanes.unshift(newCorr);
     syncSavePane(newCorr);
     document.getElementById('corrNature').value = 'Elétrica';
+    document.getElementById('corrPhoto').value = '';
     document.getElementById('corrNatureOther').value = '';
     toggleNatureOther();
 
@@ -1256,7 +1544,6 @@
       html += `
         <tr>
           <td><span class="badge ${badgeType}">${label}</span></td>
-          <td style="font-family:'Roboto Mono',monospace; font-weight:600; color:var(--fab-blue);">${p.eqCode}</td>
           <td><b>${eq.name}</b></td>
           <td>${eq.base}</td>
           <td style="font-family:'Roboto Mono',monospace;">${p.date}</td>
@@ -1272,7 +1559,6 @@
       html += `
         <tr>
           <td><span class="badge urgente">Pane Urgente</span></td>
-          <td style="font-family:'Roboto Mono',monospace; font-weight:600; color:var(--fab-blue);">${c.eqCode}</td>
           <td><b>${eq.name}</b></td>
           <td>${eq.base}</td>
           <td style="font-family:'Roboto Mono',monospace;">${c.date}</td>
@@ -1282,43 +1568,10 @@
       `;
     });
 
-    tbody.innerHTML = html || '<tr><td colspan="7" style="text-align:center; padding:25px; color:var(--gray-500);">Nenhum alerta ativo no momento. Frota 100% pronta.</td></tr>';
+    tbody.innerHTML = html || '<tr><td colspan="6" style="text-align:center; padding:25px; color:var(--gray-500);">Nenhum alerta ativo no momento. Frota 100% pronta.</td></tr>';
   }
 
-  function renderInventory() {
-    const search = document.getElementById('filterSearch').value.toLowerCase();
-    const statusFilter = document.getElementById('filterStatus').value;
-    const catFilter = document.getElementById('filterCategory').value;
-
-    const tbody = document.getElementById('inventoryTableBody');
-    const filtered = equipments.filter(e => {
-      const matchSearch = e.code.toLowerCase().includes(search) || e.name.toLowerCase().includes(search) || e.base.toLowerCase().includes(search);
-      const matchStatus = !statusFilter || e.status === statusFilter;
-      const matchCat = !catFilter || e.category === catFilter;
-      return matchSearch && matchStatus && matchCat;
-    });
-
-    let html = '';
-    filtered.forEach(e => {
-      const badgeClass = e.status === 'Transferido para outra OM' ? 'transferido' : e.status.toLowerCase().includes('preventiva') ? 'preventiva' : (e.status.toLowerCase().includes('operacional') ? 'operacional' : (e.status.toLowerCase().includes('inoperante') ? 'inoperante' : 'corretiva'));
-      html += `
-        <tr>
-          <td style="font-family:'Roboto Mono',monospace; font-weight:600; color:var(--fab-blue);">${e.code}</td>
-          <td><b>${e.name}</b></td>
-          <td><span style="font-size:11px; background:var(--gray-100); padding:2px 6px; border-radius:2px;">${e.category}</span></td>
-          <td>${e.base}</td>
-          <td style="font-family:'Roboto Mono',monospace;">${e.proxima_preventiva || '-'}</td>
-          <td><span class="badge ${badgeClass}">${e.status}</span></td>
-          <td style="max-width:180px; text-overflow:ellipsis; overflow:hidden;" title="${e.notes}">${e.notes || '-'}</td>
-          <td style="text-align: right;">
-            <button class="btn sm outline" style="color:var(--fab-blue); border-color:var(--fab-blue);" onclick="editEquipment('${e.id}')">Editar</button>
-            <button class="btn sm danger" onclick="deleteEquipment('${e.id}')">Excluir</button>
-          </td>
-        </tr>
-      `;
-    });
-    tbody.innerHTML = html || '<tr><td colspan="8" style="text-align:center; padding:30px; color:var(--gray-500);">Nenhum equipamento encontrado.</td></tr>';
-  }
+  
 
   function renderPreventiveTable() {
     const tbody = document.getElementById('preventiveTableBody');
@@ -1334,7 +1587,6 @@
       html += `
         <tr>
           <td style="font-family:'Roboto Mono',monospace; font-weight:600;">${p.date}</td>
-          <td style="font-family:'Roboto Mono',monospace; color:var(--fab-blue);">${p.eqCode}</td>
           <td><b>${eq.name}</b></td>
           <td>${eq.base}</td>
           <td>${p.tech || 'Equipe Manutenção'}</td>
@@ -1346,7 +1598,7 @@
         </tr>
       `;
     });
-    tbody.innerHTML = html || '<tr><td colspan="8" style="text-align:center; padding:25px; color:var(--gray-500);">Nenhuma manutenção preventiva agendada.</td></tr>';
+    tbody.innerHTML = html || '<tr><td colspan="7" style="text-align:center; padding:25px; color:var(--gray-500);">Nenhuma manutenção preventiva agendada.</td></tr>';
   }
 
   function renderCorrectiveTable() {
@@ -1358,7 +1610,6 @@
       html += `
         <tr>
           <td style="font-family:'Roboto Mono',monospace;">${c.date}</td>
-          <td style="font-family:'Roboto Mono',monospace; color:var(--fab-blue); font-weight:600;">${c.eqCode}</td>
           <td><b>${eq.name}</b><br><small style="color:var(--gray-500);">${c.desc}</small></td>
           <td>${c.tech || 'Especialista'}</td>
           <td><span class="badge ${badgeCl}">${c.status}</span></td>
@@ -1368,14 +1619,14 @@
         </tr>
       `;
     });
-    tbody.innerHTML = html || '<tr><td colspan="6" style="text-align:center; padding:25px; color:var(--gray-500);">Nenhuma pane registrada.</td></tr>';
+    tbody.innerHTML = html || '<tr><td colspan="5" style="text-align:center; padding:25px; color:var(--gray-500);">Nenhuma pane registrada.</td></tr>';
   }
 
   // GRÁFICOS (CHART.JS)
   function renderCharts() {
     renderNatureChart();
     // 1. Categoria
-    const fleet = equipments.filter(e => e.status !== 'Transferido para outra OM');
+    const fleet = activeEq().filter(e => e.status !== 'Transferido para outra OM');
     const categories = [...new Set(fleet.map(e => e.category).filter(Boolean))].sort();
     const catCounts = categories.map(cat => fleet.filter(e => e.category === cat).length);
 
@@ -1402,10 +1653,10 @@
     });
 
     // 2. Status
-    const opCount = equipments.filter(e => e.status === 'Operacional').length;
-    const prevCount = equipments.filter(e => e.status === 'Preventiva').length;
-    const corrCount = equipments.filter(e => e.status === 'Corretiva' || e.status === 'Inoperante').length;
-    const trCount = equipments.filter(e => e.status === 'Transferido para outra OM').length;
+    const opCount = activeEq().filter(e => e.status === 'Operacional').length;
+    const prevCount = activeEq().filter(e => e.status === 'Preventiva').length;
+    const corrCount = activeEq().filter(e => e.status === 'Corretiva' || e.status === 'Inoperante').length;
+    const trCount = equipments.filter(isTransferred).length;
 
     const ctxStatus = document.getElementById('chartStatus').getContext('2d');
     if(chartStatusInstance) chartStatusInstance.destroy();
@@ -1430,7 +1681,7 @@
   // EXPORTAR CSV
   function exportDataCSV() {
     let csvContent = "data:text/csv;charset=utf-8,Codigo;Nome;Categoria;Base;ProximaPreventiva;Status;Observacoes\r\n";
-    equipments.forEach(e => {
+    activeEq().forEach(e => {
       csvContent += `"${e.code}";"${e.name}";"${e.category}";"${e.base}";"${e.proxima_preventiva}";"${e.status}";"${e.notes}"\r\n`;
     });
     const encodedUri = encodeURI(csvContent);
